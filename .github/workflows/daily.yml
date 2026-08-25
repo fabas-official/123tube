@@ -1,0 +1,41 @@
+name: daily-build
+
+# 毎朝 21:10 UTC = 日本時間 06:10 に実行。内田さんのPCが落ちていても GitHub 側で走る。
+# workflow_dispatch を付けてあるので、手動実行ボタンからいつでも即時更新できる。
+on:
+  schedule:
+    - cron: '10 21 * * *'
+  workflow_dispatch:
+
+# index.html / data.json を書き戻すため書き込み権限が要る
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # build.py は Python 標準ライブラリだけで動くので pip install は不要
+      - name: Build site
+        env:
+          YT_API_KEY: ${{ secrets.YT_API_KEY }}
+        run: python build.py
+
+      # 差分が無い日は commit しない（空コミットでヒストリを汚さない）
+      - name: Commit updated site
+        run: |
+          git config user.name  "123tube-bot"
+          git config user.email "actions@github.com"
+          git add index.html data.json history.json ownch_top.json
+          if git diff --staged --quiet; then
+            echo "変更なし。コミットをスキップ"
+          else
+            git commit -m "daily update $(date -u -d '+9 hours' '+%Y-%m-%d %H:%M') JST"
+            git push
+          fi
