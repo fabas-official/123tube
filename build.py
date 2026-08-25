@@ -11,6 +11,13 @@ YouTube API Services 規約の遵守点:
   - 動画は youtube.com の視聴ページへリンクするだけ。サムネもGoogle側URLを直参照
   - サイト名に YouTube / YT を含めない（ブランドガイドライン準拠。名称は 123Tube）
 
+観られない動画をランキングに載せない仕組み（2026-08-26 内田さん指摘で追加）:
+  - 削除・非公開になった動画は videos.list のレスポンスから消えるため自動で落ちる
+  - 消えないのに日本では観られないもの（年齢制限 / regionRestriction で日本がブロック）は
+    unplayable() で明示的に弾く
+  - 弾いた分は再生数順に並べ直したあと上位を切るので、**下位が自動で繰り上がる**
+  - 除外が起きた日は件数と理由を必ずログに出す（握り潰さない）
+
 クォータ: search.list=100u / videos.list=1u / mostPopular=1u
   → 検索21本 + 各種 = 約2,120u（1日上限10,000）
 """
@@ -93,15 +100,53 @@ def parse_dur(iso):
     return '%d:%02d:%02d' % (h, mi, s) if h else '%d:%02d' % (mi, s)
 
 
+def unplayable(it):
+    """日本の閲覧者が「この動画は利用できません」に当たる動画を弾く。理由文字列 or None を返す。
+
+    削除・非公開になった動画は videos.list のレスポンスから消えるので自動で落ちる。
+    ここで見るのは **消えないのに日本では見られない** ケース（2026-08-26 内田さん指摘で追加）。
+
+    ⚠️ 判定は「明確な証拠があるときだけ弾く」設計にしている。
+       フィールドが欠けているだけで弾くと、API仕様変更でランキングが空になり
+       main() の部分失敗ガードに引っかかってサイトが更新されなくなる（＝守りすぎて壊す）。
+    """
+    stat = it.get('status', {})
+    if stat.get('privacyStatus') == 'private':
+        return 'private'
+    if stat.get('uploadStatus') in ('rejected', 'failed', 'deleted'):
+        return 'upload:' + stat['uploadStatus']
+
+    cd = it.get('contentDetails', {})
+    # 年齢制限はログインの壁が出て、そのままでは観られない
+    if cd.get('contentRating', {}).get('ytRating') == 'ytAgeRestricted':
+        return 'age-restricted'
+
+    rr = cd.get('regionRestriction', {})
+    if REGION in (rr.get('blocked') or []):
+        return 'blocked:' + REGION
+    allowed = rr.get('allowed')
+    if allowed is not None and REGION not in allowed:
+        return 'not-allowed:' + REGION
+    return None
+
+
 def hydrate(ids):
-    """IDリスト -> 実統計付きデータ。videos.list は50件までなので分割して呼ぶ。"""
-    out = []
+    """IDリスト -> 実統計付きデータ。videos.list は50件までなので分割して呼ぶ。
+
+    videos.list のクォータは part の数に関係なく 1ユニット固定なので、
+    status を足しても消費は増えない。
+    """
+    out, dropped = [], []
     for i in range(0, len(ids), 50):
-        v = api('videos', {'part': 'snippet,statistics,contentDetails',
+        v = api('videos', {'part': 'snippet,statistics,contentDetails,status',
                            'id': ','.join(ids[i:i + 50]), 'maxResults': 50})
         for it in v.get('items', []):
             st = it.get('statistics', {})
             if 'viewCount' not in st:          # 再生数非公開はランキングに載せられない
+                continue
+            why = unplayable(it)
+            if why:                            # 観られない動画は載せない＝下位が自動で繰り上がる
+                dropped.append(why)
                 continue
             sn = it['snippet']
             th = sn.get('thumbnails', {})
@@ -114,6 +159,9 @@ def hydrate(ids):
                 'duration': parse_dur(it.get('contentDetails', {}).get('duration', '')),
                 'thumb': (th.get('medium') or th.get('high') or th.get('default') or {}).get('url', ''),
             })
+    if dropped:
+        # 握り潰さず必ず出す（最上位ルール(-0.4)「判定より先に数を出す」と同じ思想）
+        print('   └ 除外 %d件: %s' % (len(dropped), ', '.join(sorted(set(dropped)))))
     return out
 
 
@@ -154,9 +202,13 @@ def dedupe_titles(vids):
 
 
 def trending():
-    """総合タブ=今日の急上昇。mostPopular は1ユニットで済む公式エンドポイント。"""
-    v = api('videos', {'part': 'snippet,statistics,contentDetails', 'chart': 'mostPopular',
-                       'regionCode': REGION, 'maxResults': 30})
+    """総合タブ=今日の急上昇。mostPopular は1ユニットで済む公式エンドポイント。
+
+    maxResults を 50（APIの上限）にしているのは、unplayable() の除外が効いたときに
+    20位まで埋まらなくなるのを防ぐため。取得件数を増やしてもクォータは1ユニットのまま。
+    """
+    v = api('videos', {'part': 'id', 'chart': 'mostPopular',
+                       'regionCode': REGION, 'maxResults': 50})
     return hydrate([i['id'] for i in v.get('items', [])])[:LIST_N]
 
 
