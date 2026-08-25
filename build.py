@@ -55,6 +55,17 @@ THEMES = [
 ]
 OWN_KEY, OWN_LABEL = 'ucchii', 'うっちーPの歌'
 OWN_NOTE = 'このサイトを作っている人が書いた歌です。作詞はぜんぶ本人。'
+
+# 各タブの先頭に固定表示する「まず観る1本」。再生数ランキングとは切り離して置く＝
+# ランキングの数値を偽らずに、入口となる動画を確実に見せるための枠。
+# ucchii: Fabasの誕生秘話＋ベスト曲を6分31秒にまとめた公式ダイジェスト（内田さん指定 2026-08-26）
+PINNED = {
+    'ucchii': {
+        'videoId': 'cWzRARpo7nQ',
+        'lead': 'まずはこの1本',
+        'note': 'Fabasの成り立ちと代表曲が、6分半で全部わかります。ここから聴き始めるのがいちばん早いです。',
+    },
+}
 # 「歌」判定に使う語。うっちーPの楽曲は「作詞：うっちー」表記が定型なのでこれを主軸にする。
 SONG_HINT = ('作詞', 'Fabas', 'ファバス', 'オリジナル曲', 'MV', 'ミュージックビデオ', 'のうた', 'の歌')
 
@@ -120,7 +131,26 @@ def theme_videos(queries, dur):
                 ids.append(vid)
     vids = hydrate(ids)
     vids.sort(key=lambda x: -x['views'])       # videos.list は入力順を保証しないので必ず再ソート
-    return vids[:LIST_N]
+    return dedupe_titles(vids)[:LIST_N]
+
+
+def norm_title(t):
+    """比較用にタイトルを正規化する。記号・空白・大小文字の違いを潰す。"""
+    return ''.join(ch for ch in t.lower() if ch.isalnum())[:24]
+
+
+def dedupe_titles(vids):
+    """ほぼ同じタイトルの動画を除く。
+    同じ内容が連番・再アップ・自動生成で複数出るチャンネルがあり、
+    そのままだとベスト3が同じ動画で埋まる（2026-08-26「びっくり」で実際に発生）。"""
+    out, seen = [], set()
+    for v in vids:
+        k = norm_title(v['title'])
+        if k and k in seen:
+            continue
+        seen.add(k)
+        out.append(v)
+    return out
 
 
 def trending():
@@ -235,6 +265,19 @@ def row(v):
             '<i>前日比 ' + delta + '</i><i>コメント ' + format(v['comments'], ',') + '</i></span></a>')
 
 
+def feature(p):
+    """タブ先頭の「まず観る1本」枠。横長サムネ＋説明の1枚もの。
+    ランキングとは別枠にしてあるので、再生数の順位を偽らずに入口動画を見せられる。"""
+    return ('<a class="feat" href="https://www.youtube.com/watch?v=' + html.escape(p['videoId']) +
+            '" target="_blank" rel="noopener">'
+            '<span class="ftw"><img loading="lazy" src="' + html.escape(p['thumb']) + '" alt="">'
+            '<i>' + html.escape(p['duration']) + '</i></span>'
+            '<span class="fmt"><em>' + html.escape(p['lead']) + '</em>'
+            '<b>' + html.escape(p['title']) + '</b>'
+            '<span class="fnote">' + html.escape(p['note']) + '</span>'
+            '<span class="fviews">▶ ' + big(p['views']) + '</span></span></a>')
+
+
 def render(d):
     tabs, panes = [], []
     for i, t in enumerate(d['themes']):
@@ -242,9 +285,11 @@ def render(d):
         own = ' own' if t['key'] == OWN_KEY else ''
         tabs.append('<button class="tab' + on + own + '" data-t="' + t['key'] + '">' +
                     html.escape(t['label']) + '</button>')
+        pin = feature(t['pinned']) if t.get('pinned') else ''
         panes.append('<section class="pane' + on + '" id="p-' + t['key'] + '">'
                      '<div class="lead"><h2>' + html.escape(t['label']) + ' ベスト3</h2>'
                      '<p>' + html.escape(t['note']) + '</p></div>'
+                     + pin +
                      '<div class="top3">' + ''.join(card(v) for v in t['videos'][:3]) + '</div>'
                      '<h3 class="rh">' + html.escape(t['label']) + ' ランキング 4位〜' +
                      str(len(t['videos'])) + '位</h3>'
@@ -255,6 +300,22 @@ def render(d):
               .replace('__UPD__', d['updated']))
     open(INDEX, 'w', encoding='utf-8').write(out)
     return len(out.encode('utf-8'))
+
+
+def write_sitemap():
+    """lastmod を当日に更新する。毎日更新されるサイトだと検索エンジンに伝えるため、
+    ここが古いままだとクロール頻度が落ちる。"""
+    today = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=9)).strftime('%Y-%m-%d')
+    xml = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+           '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+           '  <url>\n'
+           '    <loc>' + SITE_URL + '</loc>\n'
+           '    <lastmod>' + today + '</lastmod>\n'
+           '    <changefreq>daily</changefreq>\n'
+           '    <priority>1.0</priority>\n'
+           '  </url>\n'
+           '</urlset>\n')
+    open(os.path.join(HERE, 'sitemap.xml'), 'w', encoding='utf-8').write(xml)
 
 
 # ---------------------------------------------------------------- main
@@ -288,17 +349,36 @@ def main():
             prev = hist.get(v['videoId'])           # 前回実行時との差＝前日比
             v['delta'] = (v['views'] - prev) if isinstance(prev, int) else None
             newhist[v['videoId']] = v['views']
-        data['themes'].append({'key': key, 'label': label, 'note': note, 'videos': vids})
+        theme = {'key': key, 'label': label, 'note': note, 'videos': vids}
+        # 固定表示の1本があれば実データを取り直して添える（失敗しても本体は落とさない）
+        if key in PINNED:
+            try:
+                got = hydrate([PINNED[key]['videoId']])
+                if got:
+                    theme['pinned'] = dict(got[0], lead=PINNED[key]['lead'], note=PINNED[key]['note'])
+                    print('   └ pinned: %s' % got[0]['title'][:40])
+                else:
+                    print('   └ NG pinned: 動画が取得できない（非公開/削除の疑い）')
+            except Exception as e:
+                print('   └ NG pinned: %s' % str(e)[:80])
+        data['themes'].append(theme)
         print('OK %s (%d)' % (label, len(vids)))
 
-    # 全滅した場合は既存の index.html を壊さずに異常終了させる（空サイトの公開を防ぐ）
-    if len(data['themes']) < 3:
-        print('FATAL: 取得できたテーマが%d件しかない。既存サイトを維持して中断' % len(data['themes']))
+    # 🚨 部分失敗で既存サイトを上書きしない（2026-08-26 事故: 8テーマ失敗したのに
+    #    「3件以上あればOK」という緩いガードを通ってしまい、13タブが5タブに欠けた状態で
+    #    index.html を上書きした）。**成功が全体の大半でなければ何も書かずに落とす**のが正解。
+    expected = len(jobs)
+    if failed or len(data['themes']) < expected - 1:
+        print('FATAL: %d/%d テーマしか取得できず（失敗=%s）。既存サイトを壊さないため何も書かずに中断'
+              % (len(data['themes']), expected, failed or 'なし'))
+        print('       原因の定番: search.list は "Search Queries per day" という'
+              '総合10,000ユニットとは別枠の日次上限を持つ。1日に何度もフルビルドすると先にここが尽きる。')
         sys.exit(1)
 
     json.dump(data, open(DATA, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
     json.dump(newhist, open(HIST, 'w', encoding='utf-8'), ensure_ascii=False)
     size = render(data)
+    write_sitemap()
     print('DONE themes=%d videos=%d bytes=%d failed=%s' % (
         len(data['themes']), sum(len(t['videos']) for t in data['themes']), size, failed or 'なし'))
 

@@ -9,6 +9,14 @@
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://fabas-official.github.io/123tube/">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebSite",
+ "name":"123Tube","alternateName":"YouTube動画まとめランキング",
+ "url":"https://fabas-official.github.io/123tube/",
+ "description":"ジャンルごとに一番再生されているYouTube動画をベスト3で毎日更新しているまとめランキングです。",
+ "inLanguage":"ja"}
+</script>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🥇</text></svg>">
 <style>
 :root{--bg:#f7f4ef;--card:#fff;--tx:#221f1c;--sub:#7f7469;--line:#e6dfd5;--ac:#e0483c;--own:#7a6cc4;
@@ -63,6 +71,23 @@ main{max-width:1120px;margin:0 auto;padding:0 16px 70px}
 .btn{align-self:flex-start;font-size:12.5px;font-weight:700;color:var(--ac);
      border:1px solid var(--ac);border-radius:999px;padding:5px 13px}
 .card:hover .btn{background:var(--ac);color:#fff}
+/* タブ先頭の「まず観る1本」枠。ランキングとは別物だと分かるよう紫系で差別化する */
+.feat{display:grid;gap:16px;grid-template-columns:1fr;align-items:center;margin:0 0 22px;
+      background:var(--card);border:1px solid var(--own);border-radius:15px;overflow:hidden;
+      box-shadow:var(--sh);transition:transform .17s}
+@media(min-width:720px){.feat{grid-template-columns:340px 1fr}}
+.feat:hover{transform:translateY(-3px)}
+.ftw{position:relative;display:block;aspect-ratio:16/9;background:#000}
+.ftw img{width:100%;height:100%;object-fit:cover;display:block}
+.ftw i{position:absolute;right:7px;bottom:7px;background:rgba(0,0,0,.82);color:#fff;
+       font-size:11.5px;font-style:normal;padding:1px 6px;border-radius:4px}
+.fmt{display:block;padding:0 18px 18px}
+@media(min-width:720px){.fmt{padding:18px 20px 18px 0}}
+.fmt em{display:inline-block;font-style:normal;font-size:11.5px;font-weight:800;letter-spacing:.08em;
+        color:#fff;background:var(--own);border-radius:999px;padding:3px 11px;margin:0 0 9px}
+.fmt b{display:block;font-size:16px;line-height:1.5;font-weight:700;margin:0 0 7px}
+.fnote{display:block;font-size:13px;color:var(--sub);line-height:1.65;margin:0 0 8px}
+.fviews{display:block;font-size:14px;font-weight:800;color:var(--own)}
 .rh{margin:44px 0 13px;font-size:16px;padding-left:11px;border-left:4px solid var(--ac)}
 .rows{border:1px solid var(--line);border-radius:13px;overflow:hidden;background:var(--card)}
 .row{display:grid;grid-template-columns:38px 106px 1fr;gap:11px;align-items:center;
