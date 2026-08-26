@@ -1,11 +1,11 @@
 <!doctype html>
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>YouTube動画まとめランキング｜ジャンル別ベスト3 - 123Tube</title>
-<meta name="description" content="飯うま・かわいい・びっくり・おもしろ・痛い・借金・スカッと・感動・怖い・すごい。ジャンルごとに一番再生されているYouTube動画をベスト3で毎日更新しています。探す手間なしで、観たいものがすぐ見つかる動画まとめランキングです。">
+<title>YouTube動画まとめランキング｜今日のベスト3と殿堂入り - 123Tube</title>
+<meta name="description" content="飯うま・かわいい・びっくり・おもしろ・痛い・借金・スカッと・感動・怖い・すごい。ジャンルごとに「今日いちばん伸びているベスト3」と「歴代の殿堂入り」を毎日まとめています。探す手間なしで観たいものがすぐ見つかる動画まとめランキングです。">
 <link rel="canonical" href="https://fabas-official.github.io/123tube/">
-<meta property="og:title" content="YouTube動画まとめランキング｜ジャンル別ベスト3 - 123Tube">
-<meta property="og:description" content="ジャンルごとに一番観られているYouTube動画を、ベスト3で毎日まとめています。">
+<meta property="og:title" content="YouTube動画まとめランキング｜今日のベスト3と殿堂入り - 123Tube">
+<meta property="og:description" content="ジャンルごとの「今日いちばん伸びているベスト3」と「歴代の殿堂入り」を毎日まとめています。">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://fabas-official.github.io/123tube/">
 <meta name="twitter:card" content="summary_large_image">
@@ -14,131 +14,255 @@
 {"@context":"https://schema.org","@type":"WebSite",
  "name":"123Tube","alternateName":"YouTube動画まとめランキング",
  "url":"https://fabas-official.github.io/123tube/",
- "description":"ジャンルごとに一番再生されているYouTube動画をベスト3で毎日更新しているまとめランキングです。",
+ "description":"ジャンルごとに「今日いちばん伸びているベスト3」と「歴代の殿堂入り」を毎日まとめている動画まとめランキングです。",
  "inLanguage":"ja"}
 </script>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🥇</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#f7f4ef;--card:#fff;--tx:#221f1c;--sub:#7f7469;--line:#e6dfd5;--ac:#e0483c;--own:#7a6cc4;
-      --gold:#e8b33a;--silver:#b6b6bd;--bronze:#c98a52;--sh:0 3px 14px rgba(70,50,25,.08)}
-@media(prefers-color-scheme:dark){:root{--bg:#15120f;--card:#1f1b17;--tx:#f1ede7;--sub:#a2968a;
-      --line:#332c24;--own:#9b8fdc;--sh:0 3px 16px rgba(0,0,0,.45)}}
+/* ───────────────────────────────────────────────────────────────
+   色は「意味」で決めている。ぱっと見でどっちの棚か分かるようにするため。
+     🔴 赤  = 今日（毎日入れ替わる）      … 総合ボタン / 上の段
+     🟡 金  = 殿堂入り（歴代・動かない）  … 下の段
+     🟣 紫  = うっちーPの歌（オリジナル） … 右の大ボタン
+   この3色はボタン・見出しバッジ・順位・再生数まで一貫させる。
+   ─────────────────────────────────────────────────────────────── */
+:root{--bg:#f7f4ef;--card:#fff;--tx:#211e1a;--sub:#7a6f64;--line:#e4ddd2;
+      --ac:#dc4034;--ac-s:#fdeceb;--own:#6f61c0;--own-s:#f0eefb;
+      --gold:#c9922a;--gold-s:#fbf3df;--silver:#9c9ca6;--bronze:#bb7c47;
+      --sh:0 3px 14px rgba(70,50,25,.09);--sh2:0 10px 28px rgba(70,50,25,.16)}
+@media(prefers-color-scheme:dark){
+  :root{--bg:#141210;--card:#1e1b17;--tx:#f2eee8;--sub:#a99d90;--line:#332c24;
+        --ac:#f2685c;--ac-s:#3a1f1c;--own:#a496e8;--own-s:#251f3d;
+        --gold:#e5b455;--gold-s:#372c12;--silver:#b6b6bd;--bronze:#c98a52;
+        --sh:0 3px 16px rgba(0,0,0,.45);--sh2:0 10px 30px rgba(0,0,0,.55)}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--tx);line-height:1.65;
-     font-family:"Hiragino Sans","Yu Gothic UI","Noto Sans JP",system-ui,sans-serif}
+body{margin:0;background:var(--bg);color:var(--tx);line-height:1.8;
+     font-family:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic UI","Noto Sans JP",system-ui,sans-serif;
+     -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 a{text-decoration:none;color:inherit}
-header{padding:32px 20px 20px;text-align:center}
-.logo{font-size:clamp(24px,5vw,34px);font-weight:800;letter-spacing:.04em;margin:0 0 6px}
+main{max-width:1180px;margin:0 auto;padding:0 16px 72px}
+
+/* ── ヘッダー ── */
+header{padding:34px 20px 20px;text-align:center}
+.logo{font-size:clamp(36px,7.4vw,52px);font-weight:900;letter-spacing:.02em;margin:0 0 8px;line-height:1}
 .logo span{color:var(--ac)}
-.tag{margin:0 0 4px;color:var(--tx);font-size:14px;font-weight:600}
-.sub2{margin:0;color:var(--sub);font-size:13px}
-nav{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--line);
-    padding:9px 12px;display:flex;gap:7px;overflow-x:auto;justify-content:flex-start}
-@media(min-width:900px){nav{justify-content:center;flex-wrap:wrap}}
-.tab{flex:0 0 auto;padding:8px 17px;border:1px solid var(--line);border-radius:999px;cursor:pointer;
-     background:var(--card);color:var(--tx);font-size:13.5px;font-weight:600;white-space:nowrap;
-     font-family:inherit;transition:.15s}
-.tab:hover{border-color:var(--ac);color:var(--ac)}
-.tab.on{background:var(--ac);border-color:var(--ac);color:#fff}
-.tab.own{border-color:var(--own);color:var(--own)}
-.tab.own.on{background:var(--own);border-color:var(--own);color:#fff}
-main{max-width:1120px;margin:0 auto;padding:0 16px 70px}
+.tag{margin:0 0 8px;font-size:clamp(15px,3vw,19px);font-weight:700;letter-spacing:.01em}
+.sub2{margin:0 auto;max-width:760px;color:var(--sub);font-size:clamp(14.5px,2.8vw,17px)}
+.sub2 .kr{color:var(--ac);font-weight:900}
+.sub2 .kg{color:var(--gold);font-weight:900}
+
+/* ── ナビ: [総合] │ 2段のジャンル │ [うっちーPの歌] ───────────────
+   左右の大ボタンは同じ幅にして中央を挟む＝左右のバランスが崩れないようにする。 */
+.navwrap{display:grid;gap:12px;grid-template-columns:1fr;margin:6px 0 30px}
+@media(min-width:1150px){.navwrap{grid-template-columns:var(--megaw) minmax(0,1fr) var(--megaw)}}
+:root{--megaw:190px}
+.tab.mega{display:grid;align-content:center;justify-items:center;gap:1px;text-align:center;
+      border-radius:18px;border:2px solid var(--line);background:var(--card);cursor:pointer;
+      padding:15px 13px;font-family:inherit;color:var(--tx);transition:.16s;box-shadow:var(--sh);
+      white-space:normal}
+.mega>*{max-width:100%}
+/* 総合はこのサイトの主役なので、ロゴと同じ級数まで上げる（内田さん指定 2026-08-26）。
+   うっちーPの歌は現状の大きさのまま。 */
+.mtrend b{font-size:clamp(29px,5.2vw,42px)!important;letter-spacing:.04em;line-height:1.05}
+.mown b{font-size:21px!important;line-height:1.3}
+.mtrend i{font-size:12px}
+.mega b{font-size:clamp(19px,3.2vw,23px);font-weight:900;letter-spacing:.02em;
+        line-height:1.3;word-break:break-word}
+.mega .mtag{font-size:15px;font-weight:900;letter-spacing:.1em;padding:4px 15px;border-radius:999px;
+            color:#fff;line-height:1.55}
+.mega i{font-style:normal;font-size:13px;color:var(--sub);line-height:1.55;margin-top:4px;
+        white-space:nowrap}
+.mcta{display:inline-block;margin-top:12px;font-size:14px;font-weight:900;letter-spacing:.04em;
+      padding:9px 20px;border-radius:999px;border:2px solid currentColor;line-height:1.2;
+      transition:.14s}
+.mtrend .mcta{color:var(--ac)}
+.mown .mcta{color:var(--own)}
+.mtrend:hover .mcta{background:var(--ac);color:#fff;border-color:var(--ac)}
+.mown:hover .mcta{background:var(--own);color:#fff;border-color:var(--own)}
+.mtrend.on .mcta,.mown.on .mcta{background:#fff;border-color:#fff}
+.mtrend.on .mcta{color:var(--ac)}
+.mown.on .mcta{color:var(--own)}
+.tab.mtrend{border-color:var(--ac);background:var(--card)}
+.mtrend .mtag{background:var(--ac)}
+.tab.mtrend:hover{background:var(--ac-s)}
+.mtrend.on{background:var(--ac);border-color:var(--ac);color:#fff;box-shadow:var(--sh2)}
+.mtrend.on .mtag{background:rgba(255,255,255,.24)}
+.mtrend.on i{color:rgba(255,255,255,.88)}
+.tab.mown{border-color:var(--own);background:var(--card)}
+.mown .mtag{background:var(--own)}
+.tab.mown:hover{background:var(--own-s)}
+.mown.on{background:var(--own);border-color:var(--own);color:#fff;box-shadow:var(--sh2)}
+.mown.on .mtag{background:rgba(255,255,255,.24)}
+.mown.on i{color:rgba(255,255,255,.88)}
+
+.rowsbox{display:grid;gap:10px;min-width:0}
+.tabrow{display:flex;flex-direction:column;align-items:stretch;gap:8px;min-width:0;
+        background:var(--card);border:2px solid var(--line);border-radius:18px;padding:8px 10px}
+.tabrow.today{border-color:var(--ac)}
+.tabrow.hof{border-color:var(--gold)}
+.rowlabel{flex:0 0 auto;display:flex;align-items:baseline;justify-content:center;gap:9px;
+          line-height:1.3;padding:8px 12px;border-radius:12px;color:#fff}
+.today .rowlabel{background:var(--ac)}
+.hof .rowlabel{background:var(--gold)}
+.rowlabel b{font-size:14.5px;font-weight:900;white-space:nowrap;letter-spacing:0}
+.rowlabel i{font-style:normal;font-size:12px;white-space:nowrap;opacity:.9;font-weight:500}
+/* 🚨 横スクロールにしない。棒を動かさないと見えないジャンルは「無い」のと同じ。
+   列数(--cols)はジャンル数の半分をビルド側が入れるので、広い画面では必ず2段になる。
+   狭い画面だけ列数を落とす。 */
+.tabs{display:grid;gap:6px;min-width:0;padding:2px;
+      grid-template-columns:repeat(3,minmax(0,1fr))}
+@media(min-width:470px){.tabs{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(min-width:700px){.tabs{grid-template-columns:repeat(var(--cols,6),minmax(0,1fr))}}
+.tab{padding:12px 4px;border:1.5px solid var(--line);border-radius:999px;cursor:pointer;text-align:center;
+     background:var(--bg);color:var(--tx);font-size:14px;font-weight:700;white-space:nowrap;
+     overflow:hidden;font-family:inherit;transition:.14s}
+.today .tab:hover{border-color:var(--ac);color:var(--ac);background:var(--ac-s)}
+.today .tab.on{background:var(--ac);border-color:var(--ac);color:#fff}
+.hof .tab:hover{border-color:var(--gold);color:var(--gold);background:var(--gold-s)}
+.hof .tab.on{background:var(--gold);border-color:var(--gold);color:#fff}
+@media(max-width:1149px){
+  .tab.mega{padding:13px}
+}
+
+/* ── 中身 ── */
+.panes{margin-top:4px}
 .pane{display:none}.pane.on{display:block}
-.lead{padding:30px 0 20px;text-align:center}
-.lead h2{margin:0 0 5px;font-size:21px}
-.lead p{margin:0;color:var(--sub);font-size:13.5px}
+.lead{padding:6px 0 22px;text-align:center}
+.lbadge{display:inline-block;font-size:12.5px;font-weight:900;letter-spacing:.14em;color:#fff;
+        background:var(--ac);border-radius:999px;padding:3px 14px;margin:0 0 10px}
+.lbadge.gold{background:var(--gold)}
+.lbadge.own{background:var(--own)}
+.lead h2{margin:0 0 8px;font-size:clamp(24px,4.8vw,33px);font-weight:900;letter-spacing:.02em;line-height:1.35}
+.lead p{margin:0 auto;max-width:680px;color:var(--sub);font-size:15px}
 .top3{display:grid;gap:18px;grid-template-columns:1fr}
 @media(min-width:720px){.top3{grid-template-columns:repeat(3,1fr)}}
-.card{background:var(--card);border:1px solid var(--line);border-radius:15px;overflow:hidden;
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden;
       box-shadow:var(--sh);display:flex;flex-direction:column;transition:transform .17s,box-shadow .17s}
-.card:hover{transform:translateY(-4px);box-shadow:0 8px 24px rgba(70,50,25,.16)}
+.card:hover{transform:translateY(-4px);box-shadow:var(--sh2)}
 .card.gold{border-top:4px solid var(--gold)}
 .card.silver{border-top:4px solid var(--silver)}
 .card.bronze{border-top:4px solid var(--bronze)}
 .tw{position:relative;aspect-ratio:16/9;background:#000}
 .tw img{width:100%;height:100%;object-fit:cover;display:block}
-.rk{position:absolute;top:-2px;left:11px;width:33px;height:41px;display:grid;place-items:center;
-    font-size:19px;font-weight:800;color:#fff;clip-path:polygon(0 0,100% 0,100% 100%,50% 82%,0 100%)}
+.rk{position:absolute;top:-2px;left:12px;width:35px;height:44px;display:grid;place-items:center;
+    font-size:20px;font-weight:900;color:#fff;clip-path:polygon(0 0,100% 0,100% 100%,50% 82%,0 100%)}
 .gold .rk{background:var(--gold)}.silver .rk{background:var(--silver)}.bronze .rk{background:var(--bronze)}
-.dur{position:absolute;right:7px;bottom:7px;background:rgba(0,0,0,.82);color:#fff;
-     font-size:11.5px;padding:1px 6px;border-radius:4px}
-.mt{padding:13px 15px 15px;display:flex;flex-direction:column;flex:1}
-.ch{margin:0 0 4px;font-size:11.5px;color:var(--sub)}
-.mt h3{margin:0 0 7px;font-size:15px;line-height:1.45;font-weight:700;
+.dur{position:absolute;right:7px;bottom:7px;background:rgba(0,0,0,.84);color:#fff;
+     font-size:12.5px;font-weight:500;padding:1px 7px;border-radius:5px}
+.mt{padding:14px 16px 16px;display:flex;flex-direction:column;flex:1}
+.ch{margin:0 0 5px;font-size:13px;color:var(--sub);font-weight:500}
+.mt h3{margin:0 0 9px;font-size:17px;line-height:1.5;font-weight:700;
        display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.vw{margin:0 0 7px;font-size:20px;font-weight:800;color:var(--ac)}
-.cm{margin:0 0 13px;font-size:12.5px;color:var(--sub);line-height:1.6;flex:1}
-.btn{align-self:flex-start;font-size:12.5px;font-weight:700;color:var(--ac);
-     border:1px solid var(--ac);border-radius:999px;padding:5px 13px}
+.vw{margin:0 0 9px;font-size:25px;font-weight:900;color:var(--ac);letter-spacing:.01em}
+.cm{margin:0 0 15px;font-size:14px;color:var(--sub);line-height:1.7;flex:1;font-weight:500}
+.btn{align-self:flex-start;font-size:14px;font-weight:700;color:var(--ac);
+     border:1.5px solid var(--ac);border-radius:999px;padding:8px 18px}
 .card:hover .btn{background:var(--ac);color:#fff}
-/* タブ先頭の「まず観る1本」枠。ランキングとは別物だと分かるよう紫系で差別化する */
+/* 殿堂入りの面だけ数字と導線を金色に寄せる＝どっちの棚を見ているか常に分かる */
+[id^="p-hof-"] .vw{color:var(--gold)}
+[id^="p-hof-"] .btn{color:var(--gold);border-color:var(--gold)}
+[id^="p-hof-"] .card:hover .btn{background:var(--gold);color:#fff}
+[id^="p-own-"] .vw{color:var(--own)}
+[id^="p-own-"] .btn{color:var(--own);border-color:var(--own)}
+[id^="p-own-"] .card:hover .btn{background:var(--own);color:#fff}
+
+/* 「まず観る1本」枠 */
 .feat{display:grid;gap:16px;grid-template-columns:1fr;align-items:center;margin:0 0 22px;
-      background:var(--card);border:1px solid var(--own);border-radius:15px;overflow:hidden;
+      background:var(--card);border:2px solid var(--own);border-radius:16px;overflow:hidden;
       box-shadow:var(--sh);transition:transform .17s}
 @media(min-width:720px){.feat{grid-template-columns:340px 1fr}}
 .feat:hover{transform:translateY(-3px)}
 .ftw{position:relative;display:block;aspect-ratio:16/9;background:#000}
 .ftw img{width:100%;height:100%;object-fit:cover;display:block}
-.ftw i{position:absolute;right:7px;bottom:7px;background:rgba(0,0,0,.82);color:#fff;
-       font-size:11.5px;font-style:normal;padding:1px 6px;border-radius:4px}
+.ftw i{position:absolute;right:7px;bottom:7px;background:rgba(0,0,0,.84);color:#fff;
+       font-size:11.5px;font-style:normal;padding:1px 7px;border-radius:5px}
 .fmt{display:block;padding:0 18px 18px}
 @media(min-width:720px){.fmt{padding:18px 20px 18px 0}}
-.fmt em{display:inline-block;font-style:normal;font-size:11.5px;font-weight:800;letter-spacing:.08em;
-        color:#fff;background:var(--own);border-radius:999px;padding:3px 11px;margin:0 0 9px}
-.fmt b{display:block;font-size:16px;line-height:1.5;font-weight:700;margin:0 0 7px}
-.fnote{display:block;font-size:13px;color:var(--sub);line-height:1.65;margin:0 0 8px}
-.fviews{display:block;font-size:14px;font-weight:800;color:var(--own)}
-.rh{margin:44px 0 13px;font-size:16px;padding-left:11px;border-left:4px solid var(--ac)}
-.rows{border:1px solid var(--line);border-radius:13px;overflow:hidden;background:var(--card)}
-.row{display:grid;grid-template-columns:38px 106px 1fr;gap:11px;align-items:center;
-     padding:10px 13px;border-bottom:1px solid var(--line)}
-@media(min-width:700px){.row{grid-template-columns:44px 124px 1fr 168px}}
+.fmt em{display:inline-block;font-style:normal;font-size:11px;font-weight:900;letter-spacing:.12em;
+        color:#fff;background:var(--own);border-radius:999px;padding:3px 12px;margin:0 0 10px}
+.fmt b{display:block;font-size:18px;line-height:1.55;font-weight:700;margin:0 0 8px}
+.fnote{display:block;font-size:14.5px;color:var(--sub);line-height:1.7;margin:0 0 9px;font-weight:500}
+.fviews{display:block;font-size:16.5px;font-weight:900;color:var(--own)}
+
+/* 一覧 */
+.rh{margin:40px 0 15px;font-size:18px;font-weight:900;padding-left:12px;border-left:5px solid var(--ac);
+    letter-spacing:.02em}
+.rh.gold{border-left-color:var(--gold)}
+.rh.own{border-left-color:var(--own)}
+.more{margin:24px 0 0;border:1.5px solid var(--line);border-radius:14px;background:var(--card);overflow:hidden}
+.more>summary{list-style:none;cursor:pointer;padding:13px 17px;font-size:13.5px;font-weight:700;color:var(--ac)}
+.more>summary::-webkit-details-marker{display:none}
+.more>summary:hover{background:var(--ac-s)}
+.more>summary::after{content:" ▼";font-size:9px}
+.more[open]>summary::after{content:" ▲"}
+.more .rows{border:0;border-top:1.5px solid var(--line);border-radius:0}
+.hnote{margin:16px 0 0;color:var(--sub);font-size:14px;text-align:center;font-weight:500}
+.rows{border:1.5px solid var(--line);border-radius:14px;overflow:hidden;background:var(--card)}
+.row{display:grid;grid-template-columns:34px 108px 1fr;gap:10px;align-items:center;
+     padding:13px 12px;border-bottom:1px solid var(--line)}
+@media(min-width:700px){.row{grid-template-columns:46px 128px 1fr 172px}}
 .row:last-child{border-bottom:0}
-.row:hover{background:rgba(224,72,60,.06)}
-.n{font-size:16px;font-weight:800;color:var(--sub);text-align:center}
-.rtw{position:relative;display:block;aspect-ratio:16/9;border-radius:7px;overflow:hidden;background:#000}
+.row:hover{background:var(--ac-s)}
+.row.hof:hover{background:var(--gold-s)}
+.n{font-size:19px;font-weight:900;color:var(--sub);text-align:center}
+.row.hof .n{color:var(--gold)}
+.rtw{position:relative;display:block;aspect-ratio:16/9;border-radius:8px;overflow:hidden;background:#000}
 .rtw img{width:100%;height:100%;object-fit:cover;display:block}
-.rtw i{position:absolute;right:3px;bottom:3px;background:rgba(0,0,0,.82);color:#fff;
-       font-size:10px;font-style:normal;padding:0 4px;border-radius:3px}
+.rtw i{position:absolute;right:3px;bottom:3px;background:rgba(0,0,0,.84);color:#fff;
+       font-size:10px;font-style:normal;padding:0 5px;border-radius:4px}
 .ri{min-width:0}
-.ri b{font-size:13.5px;line-height:1.45;font-weight:600;
+.ri b{font-size:15.5px;line-height:1.55;font-weight:700;
       display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.ri em{display:block;font-style:normal;font-size:11.5px;color:var(--sub)}
+.ri em{display:block;font-style:normal;font-size:13px;color:var(--sub);font-weight:500}
 .rs{display:none}
 @media(min-width:700px){.rs{display:block;text-align:right}}
-.rs u{display:block;text-decoration:none;font-size:15px;font-weight:800}
-.rs i{display:block;font-style:normal;font-size:11px;color:var(--sub)}
-.up{color:#2e9e63;font-weight:700}.flat{color:var(--sub)}
-footer{border-top:1px solid var(--line);padding:28px 20px 46px;text-align:center;
-       color:var(--sub);font-size:12px;line-height:1.9}
-footer a{color:var(--ac);font-weight:600}
+.rs u{display:block;text-decoration:none;font-size:17px;font-weight:900}
+.rs i{display:block;font-style:normal;font-size:12.5px;color:var(--sub);font-weight:500}
+.up{color:#2e9e63;font-weight:900}.flat{color:var(--sub)}
+
+footer{border-top:1px solid var(--line);padding:32px 20px 54px;text-align:center;
+       color:var(--sub);font-size:13.5px;line-height:2.05}
+footer b{color:var(--tx)}
+footer a{color:var(--ac);font-weight:700}
 </style></head><body>
 <header>
   <p class="logo">123<span>Tube</span></p>
-  <h1 class="tag">YouTube動画まとめランキング｜ジャンル別ベスト3</h1>
-  <p class="sub2">探すのが面倒な日に。ジャンルごとの「一番観られてる動画」だけ置いてあります。</p>
+  <h1 class="tag">YouTube動画まとめランキング｜今日のベスト3と、殿堂入り</h1>
+  <p class="sub2">探すのが面倒な日に。<b class="kr">赤＝今日いちばん伸びてるやつ</b> ／ <b class="kg">金＝歴代の殿堂入り</b>です。</p>
 </header>
-<nav>__TABS__</nav>
-<main>__PANES__</main>
+<main>__BODY__</main>
 <footer>
   <p>最終更新: __UPD__ ／ 対象地域: 日本 ／ 毎日自動更新<br>
-  再生回数・コメント数は YouTube Data API v3 から取得した取得時点の公式数値です。<br>
-  ジャンル別のタブは「直近90日に公開された動画」の中での再生回数順です（総合タブは当日の急上昇）。<br>
-  同じチャンネルばかりが並ばないよう、1つのタブに同じチャンネルは3本までにしています。<br>
+  再生回数・コメント数は YouTube Data API v3 から取得した、取得時点の公式数値です。<br>
+  <b>今日のベスト3（赤）</b>＝直近90日に公開された動画のうち、前日から再生回数がいちばん伸びたもの順です。総合は当日の急上昇そのものです。<br>
+  <b>殿堂入り（金）</b>＝公開日を問わない歴代の再生回数順です。1日2ジャンルずつ順番に取り直しています。<br>
+  今日の棚には殿堂入りの動画を出さないようにしているので、同じ動画が上下に並ぶことはありません。<br>
+  同じチャンネルばかりが並ばないよう、1つの棚に同じチャンネルは3本までにしています。大きく出るベスト3の枠は、必ず違うチャンネルから選んでいます。<br>
   日本で再生できない動画（削除・非公開・地域制限・年齢制限）は載せていません。<br>
   動画の再生は YouTube 上で行われます。当サイトは動画を保存・再配信していません。</p>
   <p><a href="https://www.youtube.com/channel/UCGkI3Cpu_a6yvizyqQLbKKA" target="_blank" rel="noopener">うっちーPとエンタメの世界</a>
    ／ <a href="https://fabas-official.github.io/" target="_blank" rel="noopener">Fabas 公式サイト</a></p>
 </footer>
 <script>
-// タブ切替。全テーマを1ファイルに持つので、GitHub Pagesに置くだけで動く。
+// タブ切替。中身は常に1面だけ出す。
+// data-g（today / hof / own）と data-t（ジャンル）の組でパネルidが決まる。
 document.querySelectorAll('.tab').forEach(function (b) {
   b.addEventListener('click', function () {
+    var p = document.getElementById('p-' + b.dataset.g + '-' + b.dataset.t);
+    if (!p) { return; }
     document.querySelectorAll('.tab').forEach(function (x) { x.classList.remove('on'); });
     document.querySelectorAll('.pane').forEach(function (x) { x.classList.remove('on'); });
     b.classList.add('on');
-    var p = document.getElementById('p-' + b.dataset.t);
-    if (p) { p.classList.add('on'); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+    p.classList.add('on');
+    // ナビが画面の上へ流れているときだけ、ナビの頭まで戻す。
+    // 毎回ページ先頭へ飛ばすと、下の段を触っているのに吹き飛ばされて操作しづらい。
+    var nav = document.querySelector('.navwrap');
+    if (nav && nav.getBoundingClientRect().top < 0) {
+      nav.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }
   });
 });
 </script>

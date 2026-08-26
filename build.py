@@ -33,7 +33,8 @@ REGION, LIST_N = 'JP', 20
 # この日数以内に公開された動画の中での再生数順にする（2026-08-26 追加）。
 # 広げるほど殿堂入り寄り・狭めるほど日替わり寄りになる。ここ1箇所で調整できる。
 FRESH_DAYS = 90
-FALLBACK_MAX = 2        # 期間指定なしでの補完を許す最大テーマ数（検索の日次別枠を守るため）
+WIDEN_DAYS = 365       # 90日で足りないジャンルを救う2段目。歴代へ飛ぶ前にここを挟む
+FALLBACK_MAX = 3        # 期間指定なしでの補完を許す最大テーマ数（検索の日次別枠を守るため）
 _fallback_used = 0      # 1回のビルド内で使った補完回数
 CHANNEL_ID = 'UCGkI3Cpu_a6yvizyqQLbKKA'          # うっちーPとエンタメの世界【大人の秘密基地】
 SITE_URL = 'https://fabas-official.github.io/123tube/'
@@ -41,34 +42,67 @@ SITE_URL = 'https://fabas-official.github.io/123tube/'
 DATA = os.path.join(HERE, 'data.json')
 HIST = os.path.join(HERE, 'history.json')
 OWNCH = os.path.join(HERE, 'ownch_top.json')
+HOF   = os.path.join(HERE, 'hof.json')
 INDEX = os.path.join(HERE, 'index.html')
+
+# 殿堂入り(歴代再生数トップ)の設定。
+# 歴代ランキングは日替わりしないので毎日取り直すのは検索クォータの丸損になる。
+#   → キャッシュに置き、1日 HOF_PER_RUN ジャンルずつ「いちばん古いものから」更新する。
+#     12ジャンル ÷ 2 = 6日で一周する＝全ジャンルが常に6日以内の鮮度。
+#     APIデータの保存は30日以内という規約もこれで満たす。
+# 消費は 2ジャンル × 2クエリ × 100u = 400u/日（1日上限10,000のうち4%）。
+HOF_PER_RUN = int(os.environ.get('HOF_PER_RUN', '2'))   # 初回の一括投入時だけ環境変数で増やす
+HOF_MAX_AGE_DAYS = 6
 
 # (キー, 表示名, [検索語...], 長さ絞り込み, 説明文)
 # videoDuration で Shorts を除外している。理由=カードが16:9なので縦動画だと絵が崩れるため。
 THEMES = [
-    ('meshi',    '飯うま',     ['大食い 爆食', '飯テロ グルメ 食べ歩き'],        'medium',
-     '大食い・爆食・グルメ。お腹が空く覚悟のある人だけどうぞ。'),
-    ('kawaii',   'かわいい',   ['猫 犬 かわいい', '赤ちゃん 動物 癒やし'],       'medium',
-     '犬・猫・赤ちゃん。無心で観たい時のための棚です。'),
-    ('bikkuri',  'びっくり',   ['衝撃映像', '奇跡の瞬間'],                       'medium',
-     '奇跡・衝撃・珍しい瞬間。思わず二度見するやつだけ。'),
-    ('omoshiro', 'おもしろ',   ['爆笑 ドッキリ', 'ハプニング 珍事件'],           'medium',
+    # ── 1行目: 「今日の話題」系（人・出来事。日替わりがいちばん激しい棚を前に）
+    ('geinou',   '芸能界',     ['芸能人 密着 ドキュメント', '芸能人 番組 名場面'],     'medium',
+     'テレビの外の顔、現場の空気。芸能の"いま"を置いています。'),
+    ('idol',     'アイドル',   ['アイドル ライブ パフォーマンス', 'アイドル 密着 バラエティ'], 'medium',
+     'ステージも、その裏側も。推しがいる人のための棚です。'),
+    ('news',     'ニュース',   ['ニュース 解説 わかりやすい', '今週 ニュース 振り返り 解説'],       'medium',
+     'いま話題になっていることを、解説つきで。毎日いちばん入れ替わります。'),
+    ('omoshiro', 'おもしろ',   ['爆笑 ドッキリ', 'ハプニング 珍事件'],               'medium',
      '爆笑・ドッキリ・珍事件。何も考えずに笑いたい日に。'),
-    ('itai',     '痛い',       ['失敗 転倒 痛い', 'やらかし 失敗集'],            'medium',
-     '見てるこっちが痛い、やらかしの記録。'),
-    ('kane',     '借金・お金', ['借金 破産 貧乏', '節約 投資 失敗'],             'medium',
-     'お金の失敗談から節約・投資まで。他人事じゃない話。'),
-    ('sukatto',  'スカッと',   ['スカッとする話 逆転', '爆死 ガチャ ロスカット'], 'medium',
-     '逆転・撃退・爆死。溜飲が下がる（or 下がらない）やつ。'),
-    ('kandou',   '感動',       ['感動 泣ける 実話', '家族 奇跡 人助け'],          'medium',
+    ('bikkuri',  'びっくり',   ['衝撃映像', '奇跡の瞬間'],                           'medium',
+     '奇跡・衝撃・珍しい瞬間。思わず二度見するやつだけ。'),
+    ('kawaii',   'かわいい',   ['猫 犬 かわいい', '赤ちゃん 動物 癒やし'],           'medium',
+     '犬・猫・赤ちゃん。無心で観たい時のための棚です。'),
+    ('meshi',    '飯うま',     ['大食い 爆食', '飯テロ グルメ 食べ歩き'],            'medium',
+     '大食い・爆食・グルメ。お腹が空く覚悟のある人だけどうぞ。'),
+    ('game',     'ゲーム',     ['ゲーム実況 神プレー', 'ゲーム 名場面 まとめ'],       'medium',
+     '実況・神プレー・やらかし。自分でやらなくても面白いところだけ。'),
+    # 🚨 アニメは本編の無断アップが多いジャンル。公式PVと考察・解説へ寄せた検索語にして、
+    #    切り抜き本編が上位に来にくいようにしている（2026-08-27 設置時の判断）。
+    ('anime',    'アニメ',     ['アニメ 公式 PV 最新', 'アニメ 名シーン 考察 解説'],   'medium',
+     '公式PVと、名シーンの考察・解説。本編の無断転載は載せない方針です。'),
+    # ── 2行目: 「気分で選ぶ」系（感情・用途。最後は流しっぱなしのBGMで締める）
+    ('ongaku',   '音楽',       ['歌ってみた 話題', 'MV 新曲 音楽'],                 'medium',
+     'MV・歌ってみた・弾いてみた。耳がよろこぶ棚です。'),
+    ('kandou',   '感動',       ['感動 泣ける 実話', '家族 奇跡 人助け'],             'medium',
      '泣きたい時は、泣いたほうがいい。'),
-    ('kowai',    '怖い',       ['心霊 怪談', '都市伝説 ゾッとする話'],            'medium',
-     '心霊・怪談・都市伝説。ひとりで観る勇気がある人向け。'),
-    ('sugoi',    'すごい',     ['職人技 神業', '世界記録 才能'],                  'medium',
+    ('renai',    '恋愛・人間関係', ['恋愛 相談 あるある', '人間関係 悩み 対処法'],    'medium',
+     '恋愛と人づきあいの話。うちの本業にいちばん近い棚です。'),
+    ('tabi',     '旅行',       ['旅行 vlog 絶景', '国内旅行 観光 おすすめ'],         'medium',
+     '絶景・食べ歩き・ひとり旅。行った気になれる棚です。'),
+    ('sugoi',    'すごい',     ['職人技 神業', '世界記録 才能'],                     'medium',
      '職人技・神業・世界記録。人間ってすごい。'),
-    ('bgm',      '作業用BGM',  ['作業用BGM 集中'],                                'long',
+    ('kowai',    '怖い',       ['心霊 怪談', '都市伝説 ゾッとする話'],               'medium',
+     '心霊・怪談・都市伝説。ひとりで観る勇気がある人向け。'),
+    ('itai',     '痛い',       ['失敗 転倒 痛い', 'やらかし 失敗集'],                'medium',
+     '見てるこっちが痛い、やらかしの記録。'),
+    ('kane',     '借金・お金', ['借金 破産 貧乏', '節約 投資 失敗'],                 'medium',
+     'お金の失敗談から節約・投資まで。他人事じゃない話。'),
+    ('bgm',      '作業用BGM',  ['作業用BGM 集中'],                                  'long',
      '手を止めずに流しっぱなしでどうぞ。'),
 ]
+
+# タブのボタンでだけ使う短い呼び名。7個×2段に収めるための措置で、
+# 見出し・説明文では正式名称（THEMES の表示名）をそのまま使う。
+SHORT_LABEL = {'kane': 'お金', 'bgm': 'BGM', 'renai': '恋愛'}
+
 OWN_KEY, OWN_LABEL = 'ucchii', 'うっちーPの歌'
 OWN_NOTE = 'このサイトを作っている人が書いた歌です。作詞はぜんぶ本人。'
 
@@ -174,6 +208,25 @@ def hydrate(ids):
     return out
 
 
+def spread_top3(vids):
+    """ベスト3が同じチャンネルで埋まらないようにする（2026-08-26 追加）。
+
+    「ニュース」で1〜3位すべてが同じ局の同じシリーズになった。再生数順としては正しいが、
+    大きく出るカードは3枚だけなので、そこが同じ配信者3連続だと「まとめ」に見えない。
+    4位以下の並びは動かさず、**先頭3枠だけ**違うチャンネルになるよう繰り上げる。
+    （チャンネルが3つ未満しか無いジャンルでは、できる範囲でだけ効く）
+    """
+    top, rest, used = [], [], set()
+    for v in vids:
+        c = v.get('channelTitle', '')
+        if len(top) < 3 and c not in used:
+            used.add(c)
+            top.append(v)
+        else:
+            rest.append(v)
+    return top + rest
+
+
 def cap_channel(vids, cap=3):
     """1つのタブが同じチャンネルで埋め尽くされるのを防ぐ（同チャンネルは cap 本まで）。
 
@@ -211,6 +264,56 @@ def search_ids(q, dur, days=None):
             if i.get('id', {}).get('videoId')]
 
 
+def read_json(path, default):
+    """壊れた/空のキャッシュで毎日の更新を止めない。読めなければ既定値を返す。
+
+    🚨 2026-08-27: history.json が0バイトになっていて、その json.load でビルドが
+       いきなり例外死した。**過去の記録が壊れているだけで今日の更新を落とすのは間違い**。
+       読めなかったことはログに必ず出す（黙って握り潰さない）。
+    """
+    if not os.path.exists(path):
+        return default
+    try:
+        with open(path, encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        print('WARN %s を読めない（%s）。空として続行する'
+              % (os.path.basename(path), str(e)[:60]))
+        return default
+
+
+def write_json(path, obj):
+    """JSONを安全に書く。一時ファイルへ書き切ってから置き換える。
+
+    🚨 2026-08-27 事故対応: 以前は `json.dump(obj, open(path,'w'))` と書いていた。
+       open('w') はその場で中身を消すので、書き終える前に落ちると **空ファイル**が残る。
+       実際に data.json と history.json が0バイトになった。
+       一時ファイルに書き切って os.replace で差し替えれば、途中で落ちても元が残る。
+    """
+    tmp = path + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(obj, f, ensure_ascii=False, indent=1)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
+
+
+def older_than_a_day(asof, now):
+    """引き継いだデータが本当に古いかを、日付ではなく**経過時間**で判定する。
+
+    同じ日に2回走ったときや、日付をまたいで数時間しか経っていないときに
+    「本日の取得に失敗しました」と全タブへ出すのは事実に反する。
+    毎日更新のサイトなので、24時間を超えて初めて「古い」と呼ぶ。
+    形式が読めないときは安全側（古い＝注意書きを出す）に倒す。
+    """
+    try:
+        a = datetime.datetime.strptime(asof[:16], '%Y-%m-%d %H:%M')
+        b = datetime.datetime.strptime(now[:16], '%Y-%m-%d %H:%M')
+        return (b - a).total_seconds() > 24 * 3600
+    except Exception:
+        return True
+
+
 def theme_videos(queries, dur):
     """複数クエリをマージして重複を除き、再生数順で上位を返す。
     1語だけだと結果が偏るため、カテゴリごとに2クエリへ分けて広く拾う設計。
@@ -232,30 +335,78 @@ def theme_videos(queries, dur):
         for vid in search_ids(q, dur, FRESH_DAYS):
             if vid not in ids:                 # 同じ動画が2クエリに出るので重複除去
                 ids.append(vid)
-    vids = cap_channel(dedupe_titles(sorted(hydrate(ids), key=lambda x: -x['views'])))
+    # ここでは cap_channel を掛けない。プールを先に3本/chへ絞ると、
+    # rank_today() が「その日の伸び」で選ぶ前に再生数順で切られてしまうため。
+    vids = dedupe_titles(sorted(hydrate(ids), key=lambda x: -x['views']))
 
     # 補完は「ほぼ空」のときだけ。20本に満たない日は、少ないまま出すほうが正しい
     # （中身が新しいことのほうが、20本ぴったり並ぶことより価値がある）。
     # search.list には総合10,000ユニットとは**別枠の日次上限**があり、
     # 全テーマで補完を走らせると検索回数が倍になって先にそこが尽きる。
     # 尽きると部分失敗ガードでサイトが1日まるごと更新されないので、補完回数自体に上限を置く。
+    global _fallback_used
+
+    # 2段目: 90日で足りないジャンルは、まず1年まで広げて埋める。
+    # いきなり歴代へ飛ばさないのは、下の段(殿堂入り)と同じ顔ぶれになるのを避けるため。
+    if len(vids) < 10 and _fallback_used < FALLBACK_MAX:
+        _fallback_used += 1
+        print('   └ 直近%d日では%d本。直近%d日まで広げて補完（%d/%d回目）'
+              % (FRESH_DAYS, len(vids), WIDEN_DAYS, _fallback_used, FALLBACK_MAX))
+        for q in queries:
+            for vid in search_ids(q, dur, WIDEN_DAYS):
+                if vid not in ids:
+                    ids.append(vid)
+        vids = dedupe_titles(sorted(hydrate(ids), key=lambda x: -x['views']))
+
+    # 3段目（最後の手段）: それでもほぼ空なら期間指定なし＝歴代から拾う。
     # 🚨 0本だけは FALLBACK_MAX を無視して必ず救う。
     #    main() は「1テーマでも空なら何も書かずに exit(1)」なので、
     #    1タブの空が **サイト全体を1日更新させない** ことに直結する。
-    global _fallback_used
     if not vids or (len(vids) < 5 and _fallback_used < FALLBACK_MAX):
         _fallback_used += 1
-        print('   └ 直近%d日では%d本しか集まらず、期間指定なしで補完（%d/%d回目）'
-              % (FRESH_DAYS, len(vids), _fallback_used, FALLBACK_MAX))
+        print('   └ まだ%d本。期間指定なしで補完（%d/%d回目）'
+              % (len(vids), _fallback_used, FALLBACK_MAX))
         for q in queries:
             for vid in search_ids(q, dur):
                 if vid not in ids:
                     ids.append(vid)
-        vids = cap_channel(dedupe_titles(sorted(hydrate(ids), key=lambda x: -x['views'])))
+        vids = dedupe_titles(sorted(hydrate(ids), key=lambda x: -x['views']))
     elif len(vids) < LIST_N:
         print('   └ 直近%d日の該当は%d本（20本に満たないが、新しさを優先してこのまま出す）'
               % (FRESH_DAYS, len(vids)))
-    return vids[:LIST_N]
+    return vids                                    # 並べ替えと20本への絞り込みは rank_today() が行う
+
+
+def rank_today(pool, hist, hof_ids):
+    """上の段（今日の1・2・3）の並び順を決める。
+
+    🚨 ここが「上の段と下の段で同じ画面が出ないようにする」中核（内田さん指定 2026-08-26）。
+      1. **前日からの伸び(delta)の大きい順**に並べる。総再生数順だと「昔から強い動画」が
+         何日も居座って日替わりにならず、下の段(殿堂入り)と同じ顔ぶれになってしまう。
+         毎日すべての候補の再生数を history.json に残しているので、その差＝1日の伸び。
+         **APIの追加消費はゼロ**（すでに取得済みの数値の引き算だけ）。
+      2. 殿堂入りに入っている動画は**明示的に外す**。下の段は「直近90日より前」が大半なので
+         普通は被らないが、90日以内に出た歴代級の特大ヒットだけは両方に載りうるため。
+      3. 伸びのデータが足りない日（初回ビルド等）は総再生数順にフォールバックする。
+         並びが多少弱くなっても、空にするよりはるかにマシ。
+    """
+    live = [v for v in pool if v['videoId'] not in hof_ids]
+    if not live:
+        live = list(pool)                          # 全部が殿堂入りなら除外は諦める（空にしない）
+    for v in live:
+        prev = hist.get(v['videoId'])
+        v['delta'] = (v['views'] - prev) if isinstance(prev, int) else None
+    buzz = [v for v in live if isinstance(v.get('delta'), int) and v['delta'] > 0]
+    if len(buzz) >= LIST_N:
+        ordered = sorted(buzz, key=lambda x: -x['delta'])
+        mode = 'その日の伸び順'
+    else:
+        ordered = sorted(live, key=lambda x: -x['views'])
+        mode = '総再生数順（伸びのデータが%d本しか無いため）' % len(buzz)
+    out = spread_top3(cap_channel(ordered))[:LIST_N]
+    print('   └ 上の段: %s / 候補%d本→%d本（殿堂入り除外%d本）'
+          % (mode, len(pool), len(out), len(pool) - len(live)))
+    return out
 
 
 def norm_title(t):
@@ -285,7 +436,7 @@ def trending():
     """
     v = api('videos', {'part': 'id', 'chart': 'mostPopular',
                        'regionCode': REGION, 'maxResults': 50})
-    return hydrate([i['id'] for i in v.get('items', [])])[:LIST_N]
+    return hydrate([i['id'] for i in v.get('items', [])])   # 20本への絞り込みは main() 側
 
 
 def scan_own_channel():
@@ -312,9 +463,8 @@ def scan_own_channel():
     vids = hydrate(ids)
     vids.sort(key=lambda x: -x['views'])
     songs = [v for v in vids if any(h in v['title'] for h in SONG_HINT)][:60]
-    json.dump({'channelId': CHANNEL_ID, 'scanned': len(vids),
-               'updated': datetime.date.today().isoformat(), 'songs': songs},
-              open(OWNCH, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+    write_json(OWNCH, {'channelId': CHANNEL_ID, 'scanned': len(vids),
+                       'updated': datetime.date.today().isoformat(), 'songs': songs})
     print('own channel rescan: %d本 -> 歌%d本' % (len(vids), len(songs)))
     return songs
 
@@ -323,8 +473,8 @@ def own_songs():
     """うっちーPの歌トップ。曲の顔ぶれは滅多に変わらないのでキャッシュを使い、
     再生数だけ取り直す（2ユニット）。30日を超えたらフル再走査＝APIデータ30日ルールも満たす。"""
     songs, stale = [], True
-    if os.path.exists(OWNCH):
-        c = json.load(open(OWNCH, encoding='utf-8'))
+    c = read_json(OWNCH, None)
+    if c:
         songs = c.get('songs', [])
         try:
             age = (datetime.date.today() -
@@ -337,6 +487,77 @@ def own_songs():
     fresh = hydrate([v['videoId'] for v in songs[:LIST_N]])
     fresh.sort(key=lambda x: -x['views'])
     return fresh[:LIST_N]
+
+
+# ---------------------------------------------------------------- 殿堂入り
+
+def hof_videos(queries, dur):
+    """そのジャンルの「歴代」再生数トップを返す。
+
+    theme_videos() との違いは publishedAfter を付けないことだけ。
+    付けない = order=viewCount がそのまま歴代ランキングになる。
+    毎日のタブは直近90日に絞ってあるので、ここが「古いけど強い動画」の受け皿になる。
+    """
+    ids = []
+    for q in queries:
+        for vid in search_ids(q, dur):          # 期間指定なし＝歴代
+            if vid not in ids:
+                ids.append(vid)
+    vids = spread_top3(cap_channel(dedupe_titles(sorted(hydrate(ids), key=lambda x: -x['views']))))
+    return vids[:LIST_N]
+
+
+def load_hof():
+    """殿堂入りキャッシュを読む。壊れていても落とさず空で返す（毎日の更新を止めない）。"""
+    return read_json(HOF, {}).get('themes', {}) or {}
+
+
+def hof_age(entry):
+    """キャッシュ1件の古さ(日)。日付が壊れていたら「とても古い」扱いにして先に更新させる。"""
+    try:
+        y, m, d = [int(x) for x in entry.get('updated', '2000-01-01').split('-')]
+        return (datetime.date.today() - datetime.date(y, m, d)).days
+    except Exception:
+        return 9999
+
+
+def refresh_hof(cache, allow):
+    """古い順に allow ジャンルだけ殿堂入りを取り直す。
+
+    🚨 1件でも失敗したら **その1件だけ諦めて古いキャッシュを残す**。
+       殿堂入りは「あれば嬉しい」情報で、これが原因で毎日の更新を止めてはいけない。
+    """
+    if allow <= 0:
+        print('殿堂入り: 今日は更新しない（検索クォータ温存）')
+        return cache, []
+    todo = sorted(THEMES, key=lambda t: -hof_age(cache.get(t[0], {})))
+    done = []
+    for key, label, queries, dur, _note in todo:
+        if len(done) >= allow:
+            break
+        age = hof_age(cache.get(key, {}))
+        if age < HOF_MAX_AGE_DAYS and cache.get(key, {}).get('videos'):
+            break                                # 以降はもっと新しい＝更新不要
+        try:
+            vids = hof_videos(queries, dur)
+        except Exception as e:
+            print('   └ NG 殿堂入り %s: %s（前のキャッシュを残す）' % (label, str(e)[:120]))
+            continue
+        if not vids:
+            print('   └ NG 殿堂入り %s: 0本（前のキャッシュを残す）' % label)
+            continue
+        for r, v in enumerate(vids, 1):
+            v['rank'] = r
+            v.pop('delta', None)                 # 歴代に前日比は意味がないので持たない
+        cache[key] = {'updated': datetime.date.today().isoformat(), 'videos': vids}
+        done.append(label)
+        print('   └ 殿堂入り更新 %s (%d本・前回から%s日)' % (label, len(vids),
+              '初回' if age >= 9999 else age))
+    return cache, done
+
+
+def save_hof(cache):
+    write_json(HOF, {'updated': datetime.date.today().isoformat(), 'themes': cache})
 
 
 # ---------------------------------------------------------------- 描画
@@ -406,30 +627,151 @@ def feature(p):
             '<span class="fviews">▶ ' + big(p['views']) + '</span></span></a>')
 
 
-def render(d):
-    tabs, panes = [], []
-    for i, t in enumerate(d['themes']):
-        on = ' on' if i == 0 else ''
-        own = ' own' if t['key'] == OWN_KEY else ''
-        tabs.append('<button class="tab' + on + own + '" data-t="' + t['key'] + '">' +
-                    html.escape(t['label']) + '</button>')
-        pin = feature(t['pinned']) if t.get('pinned') else ''
-        panes.append('<section class="pane' + on + '" id="p-' + t['key'] + '">'
-                     '<div class="lead"><h2>' + html.escape(t['label']) + ' ベスト3</h2>'
-                     '<p>' + html.escape(t['note']) +
-                     ('<br><small>※このタブは ' + html.escape(t.get('asof', '')) +
-                      ' 時点のままです（本日の取得に失敗したため）</small>' if t.get('stale') else '') +
-                     '</p></div>'
-                     + pin +
-                     '<div class="top3">' + ''.join(card(v) for v in t['videos'][:3]) + '</div>'
-                     '<h3 class="rh">' + html.escape(t['label']) + ' ランキング 4位〜' +
-                     str(len(t['videos'])) + '位</h3>'
-                     '<div class="rows">' + ''.join(row(v) for v in t['videos'][3:]) + '</div></section>')
+def hrow(v, rank):
+    """殿堂入り用の1行。歴代ランキングに前日比は意味がないので、代わりに公開日を出す。"""
+    return ('<a class="row hof" href="https://www.youtube.com/watch?v=' + html.escape(v['videoId']) +
+            '" target="_blank" rel="noopener">'
+            '<span class="n">' + str(rank) + '</span>'
+            '<span class="rtw"><img loading="lazy" src="' + html.escape(v['thumb']) + '" alt="">'
+            '<i>' + html.escape(v['duration']) + '</i></span>'
+            '<span class="ri"><b>' + html.escape(v['title']) + '</b>'
+            '<em>' + html.escape(v['channelTitle']) + '</em></span>'
+            '<span class="rs"><u>' + format(v['views'], ',') + '</u>'
+            '<i>公開 ' + html.escape(v.get('publishedAt', '')) + '</i>'
+            '<i>コメント ' + format(v.get('comments', 0), ',') + '</i></span></a>')
+
+
+def tab_btn(key, label, group):
+    return ('<button class="tab" data-g="' + group + '" data-t="' + key + '">' +
+            html.escape(label) + '</button>')
+
+
+def pane(pid, on, inner):
+    return '<section class="pane' + (' on' if on else '') + '" id="' + pid + '">' + inner + '</section>'
+
+
+def today_pane(t, on):
+    """上の段の中身＝そのジャンルの「今日のベスト3」。
+
+    🚨 ここは総再生数の“ベスト”ではなく **その日いちばん伸びたもの** を並べている。
+       総再生数順にすると昔から強い動画が何日も居座り、下の段(殿堂入り)と
+       同じ顔ぶれになって段を分けた意味が消えるため（内田さん指摘 2026-08-26）。
+    """
+    vids = t['videos']
+    stale = ('<br><small>※ ' + html.escape(t.get('asof', '')) +
+             ' 時点のままです（本日の取得に失敗したため）</small>') if t.get('stale') else ''
+    pin = feature(t['pinned']) if t.get('pinned') else ''
+    rest = ''
+    if len(vids) > 3:
+        rest = ('<h3 class="rh">今日の 4位〜' + str(len(vids)) + '位</h3>'
+                '<div class="rows">' + ''.join(row(v) for v in vids[3:]) + '</div>')
+    head = ('<div class="lead"><span class="lbadge">今日</span>'
+            '<h2>' + html.escape(t['label']) + ' ベスト3</h2>'
+            '<p>' + html.escape(t['note']) + stale + '</p></div>')
+    return pane('p-today-' + t['key'], on,
+                head + pin + '<div class="top3">' + ''.join(card(v) for v in vids[:3]) + '</div>' + rest)
+
+
+def hof_pane(key, label, entry, on):
+    """下の段の中身＝そのジャンルの殿堂入り（歴代の再生回数トップ）。
+
+    見出しに本数を「20」と決め打ちしない。除外が効いて19本になる日があるため、
+    実際の本数をそのまま書く（内田さん指摘 2026-08-26）。
+    """
+    # キャッシュは取得当時の並びなので、表示のたびにベスト3のチャンネル重複だけ直す。
+    # （spread_top3 を入れる前に取った分にも効かせるため。4位以下の順位は動かさない）
+    vids = spread_top3(list((entry or {}).get('videos') or []))
+    for i, v in enumerate(vids, 1):
+        v['rank'] = i
+    n = len(vids)
+    head = ('<div class="lead"><span class="lbadge gold">殿堂入り</span>'
+            '<h2>' + html.escape(label) + ' 歴代ベスト' + (str(n) if n else '') + '</h2>'
+            '<p>公開日を問わない、これまででいちばん再生された動画です。ここは毎日は変わりません。</p></div>')
+    if not vids:
+        return pane('p-hof-' + key, on, head +
+                    '<p class="hnote">この棚はまだ集計中です。1日2ジャンルずつ順番に集めているので、'
+                    '数日以内にここへ入ります。</p>')
+    body = '<div class="top3">' + ''.join(card(v) for v in vids[:3]) + '</div>'
+    if n > 3:
+        body += ('<h3 class="rh gold">4位〜' + str(n) + '位</h3><div class="rows">' +
+                 ''.join(hrow(v, i) for i, v in enumerate(vids[3:], 4)) + '</div>')
+    body += '<p class="hnote">集計時点: ' + html.escape(entry.get('updated', '')) + '</p>'
+    return pane('p-hof-' + key, on, head + body)
+
+
+def own_pane(t, on):
+    """左右のうち右側の大ボタンの中身。歌は順位がほとんど動かないので独立させている。"""
+    if not t:
+        return ''
+    vids = t['videos']
+    pin = feature(t['pinned']) if t.get('pinned') else ''
+    rows = ('<h3 class="rh own">4位〜' + str(len(vids)) + '位</h3><div class="rows">' +
+            ''.join(row(v) for v in vids[3:]) + '</div>') if len(vids) > 3 else ''
+    head = ('<div class="lead"><span class="lbadge own">うっちーPの歌</span>'
+            '<h2>再生回数トップ' + str(len(vids)) + '</h2>'
+            '<p>' + html.escape(t['note']) + '</p></div>')
+    return pane('p-own-' + t['key'], on,
+                head + pin + '<div class="top3">' + ''.join(card(v) for v in vids[:3]) + '</div>' + rows)
+
+
+def render(d, hofc):
+    """内田さんの手描きイメージ通りのナビを組む（2026-08-26）。
+
+        [ 総合 ]  | 今日のベスト3 | 飯うま かわいい … |  [ うっちーPの歌 ]
+                  | 殿堂入り      | 飯うま かわいい … |
+
+    ・総合とうっちーPの歌は左右に同じ幅の大ボタンで置き、2段のどちらにも属さない
+      （総合＝当日の急上昇しか存在しない／歌＝順位がほとんど動かない、で性質が違う）
+    ・中央の2段はそれぞれ枠で囲って区切る。同じジャンル名が上下に並ぶので、
+      どちらの段を押したかで出るものが変わるのが直感的に分かる
+    ・中身は1面だけ出す。上下を同時に開くと縦に長くなりすぎるため
+    """
+    themes = {t['key']: t for t in d['themes']}
+    genres = [(k, l) for (k, l, _q, _dur, _n) in THEMES if k in themes]
+
+    mega_t = ('<button class="tab mega mtrend on" data-g="today" data-t="trend">'
+              '<span class="mtag">今日</span><b>総合</b>'
+              '<i>いま日本で伸びてる<br>ベスト20</i>'
+              '<span class="mcta">見る →</span></button>') if 'trend' in themes else ''
+    mega_o = ('<button class="tab mega mown" data-g="own" data-t="' + OWN_KEY + '">'
+              '<span class="mtag">オリジナル</span><b>' + html.escape(OWN_LABEL) + '</b>'
+              '<i>作詞はぜんぶ本人</i>'
+              '<span class="mcta">聴く →</span></button>') if OWN_KEY in themes else ''
+
+    # 列数はジャンル数の半分（切り上げ）。こうすると何ジャンルに増減しても
+    # 広い画面では必ず「2段ちょうど」に収まる（内田さん指定 2026-08-26）。
+    cols = max(1, -(-len(genres) // 2))
+    def btns(group):
+        return ('<div class="tabs" style="--cols:' + str(cols) + '">' +
+                ''.join(tab_btn(k, SHORT_LABEL.get(k, l), group) for k, l in genres) + '</div>')
+    r_today = ('<div class="tabrow today">'
+               '<span class="rowlabel"><b>今日のベスト3</b><i>毎日入れ替わる</i></span>'
+               + btns('today') + '</div>')
+    r_hof = ('<div class="tabrow hof">'
+             '<span class="rowlabel"><b>殿堂入りベスト' + str(LIST_N) + '</b>'
+             '<i>歴代ぜんぶから</i></span>'
+             + btns('hof') + '</div>')
+
+    nav = ('<div class="navwrap">' + mega_t +
+           '<div class="rowsbox">' + r_today + r_hof + '</div>' + mega_o + '</div>')
+
+    panes = []
+    if 'trend' in themes:
+        panes.append(today_pane(themes['trend'], True))
+    for k, _l in genres:
+        panes.append(today_pane(themes[k], False))
+    for k, l in genres:
+        panes.append(hof_pane(k, l, hofc.get(k), False))
+    panes.append(own_pane(themes.get(OWN_KEY), False))
+
+    body = nav + '<div class="panes">' + ''.join(panes) + '</div>'
     tpl = open(os.path.join(HERE, 'template.html'), encoding='utf-8').read()
-    out = (tpl.replace('__TABS__', ''.join(tabs))
-              .replace('__PANES__', ''.join(panes))
-              .replace('__UPD__', d['updated']))
-    open(INDEX, 'w', encoding='utf-8').write(out)
+    out = tpl.replace('__BODY__', body).replace('__UPD__', d['updated'])
+    with open(INDEX + '.tmp', 'w', encoding='utf-8') as f:
+        f.write(out)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(INDEX + '.tmp', INDEX)
     return len(out.encode('utf-8'))
 
 
@@ -446,7 +788,10 @@ def write_sitemap():
            '    <priority>1.0</priority>\n'
            '  </url>\n'
            '</urlset>\n')
-    open(os.path.join(HERE, 'sitemap.xml'), 'w', encoding='utf-8').write(xml)
+    _sm = os.path.join(HERE, 'sitemap.xml')
+    with open(_sm + '.tmp', 'w', encoding='utf-8') as f:
+        f.write(xml)
+    os.replace(_sm + '.tmp', _sm)
 
 
 # ---------------------------------------------------------------- main
@@ -456,32 +801,38 @@ def main():
     _fallback_used = 0
     if not API_KEY:
         print('FATAL: 環境変数 YT_API_KEY が未設定'); sys.exit(1)
-    hist = json.load(open(HIST, encoding='utf-8')) if os.path.exists(HIST) else {}
+    hist = read_json(HIST, {})
     # 前日の結果。取得に失敗したテーマだけ、これを引き継いで穴を空けないために使う。
-    prev_themes, prev_updated = {}, ''
-    if os.path.exists(DATA):
-        try:
-            _pd = json.load(open(DATA, encoding='utf-8'))
-            prev_themes = {t['key']: t for t in _pd.get('themes', [])}
-            prev_updated = _pd.get('updated', '')
-        except Exception as e:
-            print('WARN 前日データを読めない（引き継ぎ無しで続行）: %s' % str(e)[:80])
+    _pd = read_json(DATA, {})
+    prev_themes = dict((t['key'], t) for t in _pd.get('themes', []) if t.get('key'))
+    prev_updated = _pd.get('updated', '')
     data = {'region': REGION, 'site': SITE_URL,
             # GitHub Actions は UTC で動くので、表示は日本時間に直す
             'updated': (datetime.datetime.now(datetime.timezone.utc) +
                         datetime.timedelta(hours=9)).strftime('%Y-%m-%d %H:%M'),
             'themes': []}
-    newhist, failed, carried = {}, [], []
+    newhist, failed, carried, pending = {}, [], [], []
+    # 殿堂入りキャッシュ。上の段から歴代組を外すために**取り直す前**の中身を使う。
+    # （歴代はほぼ動かないので1日古くても実害が無く、循環参照を避けられる）
+    hofc = load_hof()
+    hof_ids = dict((k, set(v['videoId'] for v in (e.get('videos') or [])))
+                   for k, e in hofc.items())
     jobs = [('trend', '総合', None, None, '今日いちばん伸びている動画。毎日入れ替わります。')] + \
            list(THEMES) + [(OWN_KEY, OWN_LABEL, None, None, OWN_NOTE)]
     for key, label, q, dur, note in jobs:
+        pool = []
         try:
             if key == 'trend':
-                vids = trending()
+                # 公式の急上昇チャートそのもの＝すでに「その日いちばん伸びているもの」の並び。
+                # ここだけは自前で並べ替えない（YouTube側の順位が最も正確なため）。
+                pool = trending()
+                vids = pool[:LIST_N]
             elif key == OWN_KEY:
-                vids = own_songs()
+                pool = own_songs()
+                vids = pool
             else:
-                vids = theme_videos(q, dur)
+                pool = theme_videos(q, dur)
+                vids = rank_today(pool, hist, hof_ids.get(key, set()))
         except Exception as e:                      # 1テーマ失敗で全体を落とさない
             print('NG %s: %s' % (label, str(e)[:160]))
             vids = None
@@ -496,19 +847,34 @@ def main():
                 print('   └ %s は前日分を引き継ぎ（%d本・%s 時点）'
                       % (label, len(keep['videos']), keep.get('asof') or prev_updated or '前回'))
                 carried.append(label)
-                theme = dict(keep, label=label, note=note,
-                             asof=keep.get('asof') or prev_updated or data['updated'], stale=True)
+                # 「今日すでに取れていた分」を引き継いだだけなら古くない。
+                # 同じ日のうちに2回走った時に全タブへ「古いです」と出すのは事実に反する。
+                _asof = keep.get('asof') or prev_updated or data['updated']
+                theme = dict(keep, label=label, note=note, asof=_asof,
+                             stale=older_than_a_day(_asof, data['updated']))
                 data['themes'].append(theme)
                 for v in theme['videos']:
                     newhist[v['videoId']] = v['views']
                 continue
-            print('EMPTY %s（前日分も無いので穴になる）' % label)
-            failed.append(label)
+            # 新設したばかりのジャンルは前日分が無くて当たり前。
+            # それを「失敗」に数えると、1つ足しただけでサイト全体が更新されなくなる。
+            # 取れるようになるまで、そのタブは出さずに待てばいい。
+            if key not in prev_themes:
+                print('SKIP %s（新設・今回は取得できず。次回に持ち越し）' % label)
+                pending.append(label)
+            else:
+                print('EMPTY %s（前日分も無いので穴になる）' % label)
+                failed.append(label)
             continue
+        # 🚨 履歴は候補プール全部を残す（表示した20本だけだと、翌日ランク外から
+        #    上がってきた動画の「伸び」が計算できず、上の段が日替わりにならない）。
+        for v in pool:
+            newhist[v['videoId']] = v['views']
         for r, v in enumerate(vids, 1):
             v['rank'] = r
-            prev = hist.get(v['videoId'])           # 前回実行時との差＝前日比
-            v['delta'] = (v['views'] - prev) if isinstance(prev, int) else None
+            if v.get('delta') is None:              # rank_today が入れていればそのまま使う
+                prev = hist.get(v['videoId'])
+                v['delta'] = (v['views'] - prev) if isinstance(prev, int) else None
             newhist[v['videoId']] = v['views']
         theme = {'key': key, 'label': label, 'note': note, 'videos': vids,
                  'asof': data['updated'], 'stale': False}
@@ -529,7 +895,10 @@ def main():
     # 🚨 部分失敗で既存サイトを上書きしない（2026-08-26 事故: 8テーマ失敗したのに
     #    「3件以上あればOK」という緩いガードを通ってしまい、13タブが5タブに欠けた状態で
     #    index.html を上書きした）。**成功が全体の大半でなければ何も書かずに落とす**のが正解。
-    expected = len(jobs)
+    expected = len(jobs) - len(pending)      # 新設で未取得のものは母数から外す
+    if pending:
+        # 握り潰さない（最上位ルール(-0.4)）。出せなかったタブは必ず名前を出す。
+        print('PENDING %d ジャンルが新設・未取得（タブはまだ出ない）: %s' % (len(pending), pending))
     if carried:
         # 握り潰さない（最上位ルール(-0.4)）。閾値内でも必ず数を出す。
         print('CARRIED %d/%d テーマが前日分の引き継ぎ: %s' % (len(carried), expected, carried))
@@ -542,14 +911,101 @@ def main():
               '総合10,000ユニットとは別枠の日次上限を持つ。1日に何度もフルビルドすると先にここが尽きる。')
         sys.exit(1)
 
-    json.dump(data, open(DATA, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
-    json.dump(newhist, open(HIST, 'w', encoding='utf-8'), ensure_ascii=False)
-    size = render(data)
+    # 殿堂入りは毎日のタブが全部揃ってから、余った枠で少しずつ取り直す。
+    # 補完(fallback)を使った日は検索の日次別枠が危ないのでスキップする＝毎日の更新を最優先。
+    allow = 0 if _fallback_used else HOF_PER_RUN
+    hofc, hof_done = refresh_hof(hofc, allow)
+    save_hof(hofc)
+    _ages = sorted(hof_age(e) for e in hofc.values())
+    print('殿堂入り: %d/%dジャンル保有・最古%s日・今日更新=%s'
+          % (len(hofc), len(THEMES), _ages[-1] if _ages else '—', hof_done or 'なし'))
+
+    write_json(DATA, data)
+    write_json(HIST, newhist)
+    size = render(data, hofc)
     write_sitemap()
     print('DONE themes=%d videos=%d bytes=%d failed=%s carried=%s' % (
         len(data['themes']), sum(len(t['videos']) for t in data['themes']), size,
         failed or 'なし', carried or 'なし'))
 
 
+def render_only():
+    """APIを1回も叩かずに index.html だけ作り直す（見た目の調整用・消費0ユニット）。
+
+    テンプレートをいじるたびにフルビルドしていると検索クォータが無駄に減るので、
+    描画だけやり直せる口を用意しておく。
+    """
+    data = read_json(DATA, {'updated': '', 'themes': []})
+    hofc = load_hof()
+    hist = read_json(HIST, {})
+    hof_ids = dict((k, set(v['videoId'] for v in (e.get('videos') or [])))
+                   for k, e in hofc.items())
+    gkeys = set(t[0] for t in THEMES)
+    for t in data.get('themes', []):
+        if t['key'] in gkeys:                      # 上の段は殿堂入り除外を効かせて並べ直す
+            t['videos'] = rank_today(t['videos'], hist, hof_ids.get(t['key'], set()))
+            for r, v in enumerate(t['videos'], 1):
+                v['rank'] = r
+    size = render(data, hofc)
+    print('RENDER-ONLY bytes=%d themes=%d' % (size, len(data.get('themes', []))))
+
+
+def fill_missing():
+    """THEMES にあって data.json に無いジャンルだけを取りに行く。
+
+    ジャンルを1つ足すたびにフルビルドすると検索を22回も無駄打ちするので、
+    不足分だけ取って既存データにマージする口を用意しておく（1ジャンル200ユニット）。
+    """
+    if not API_KEY:
+        print('FATAL: 環境変数 YT_API_KEY が未設定'); sys.exit(1)
+    data = read_json(DATA, None)
+    if not data or not data.get('themes'):
+        print('FATAL: data.json が読めない/空。--fill-missing は既存台帳への追記専用'); sys.exit(1)
+    have = set(t['key'] for t in data.get('themes', []))
+    hist = read_json(HIST, {})
+    todo = [t for t in THEMES if t[0] not in have]
+    if not todo:
+        print('不足ジャンルなし'); return
+    print('不足 %d ジャンル: %s' % (len(todo), [t[1] for t in todo]))
+    added = []
+    for key, label, queries, dur, note in todo:
+        try:
+            pool = theme_videos(queries, dur)
+            vids = rank_today(pool, hist, set())
+        except Exception as e:
+            print('NG %s: %s' % (label, str(e)[:140])); continue
+        if not vids:
+            print('EMPTY %s' % label); continue
+        for r, v in enumerate(vids, 1):
+            v['rank'] = r
+        for v in pool:
+            hist[v['videoId']] = v['views']
+        data['themes'].append({'key': key, 'label': label, 'note': note,
+                               'videos': vids, 'asof': data['updated'], 'stale': False})
+        added.append('%s(%d)' % (label, len(vids)))
+    # THEMES の並び順に合わせ直す（総合が先頭・うっちーPの歌が末尾は維持）
+    order = ['trend'] + [t[0] for t in THEMES] + [OWN_KEY]
+    data['themes'].sort(key=lambda t: order.index(t['key']) if t['key'] in order else 999)
+    write_json(DATA, data)
+    write_json(HIST, hist)
+    print('FILL-MISSING 追加=%s' % (added or 'なし'))
+
+
+def hof_only():
+    """殿堂入りキャッシュだけを埋める（初回の一括投入用）。HOF_PER_RUN ジャンルまで。"""
+    if not API_KEY:
+        print('FATAL: 環境変数 YT_API_KEY が未設定'); sys.exit(1)
+    hofc, done = refresh_hof(load_hof(), HOF_PER_RUN)
+    save_hof(hofc)
+    print('HOF-ONLY 更新=%s / 保有=%d/12ジャンル' % (done or 'なし', len(hofc)))
+
+
 if __name__ == '__main__':
-    main()
+    if '--render-only' in sys.argv:
+        render_only()
+    elif '--hof-only' in sys.argv:
+        hof_only()
+    elif '--fill-missing' in sys.argv:
+        fill_missing()
+    else:
+        main()
