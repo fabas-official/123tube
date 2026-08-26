@@ -165,21 +165,45 @@ def hydrate(ids):
     return out
 
 
+def cap_channel(vids, cap=3):
+    """1つのタブが同じチャンネルで埋め尽くされるのを防ぐ（同チャンネルは cap 本まで）。
+
+    2026-08-26 実測: 「怖い」20本中18本(90%)、「おもしろ」20本中17本(85%)が
+    Fischer's 1チャンネルだった。再生数順としては正しいが、
+    「ジャンルの棚」としては機能しないので上限を設ける。
+
+    ⚠️ theme_videos() の中でだけ使う。
+       うっちーPの歌タブ(own_songs)は100%自チャンネルで正しいので、絶対に通さないこと。
+    """
+    out, cnt = [], {}
+    for v in vids:
+        c = v.get('channelTitle', '')
+        if cnt.get(c, 0) >= cap:
+            continue
+        cnt[c] = cnt.get(c, 0) + 1
+        out.append(v)
+    return out
+
+
 def theme_videos(queries, dur):
     """複数クエリをマージして重複を除き、再生数順で上位を返す。
-    1語だけだと結果が偏るため、カテゴリごとに2クエリへ分けて広く拾う設計。"""
+    1語だけだと結果が偏るため、カテゴリごとに2クエリへ分けて広く拾う設計。
+
+    maxResults=50 は search.list の上限。**search.list は1回100ユニット固定で
+    maxResults を増やしても消費は変わらない**ので、候補は取れるだけ取る。
+    cap_channel で寡占チャンネルを削ったあとに20本を埋めるには候補数が要る。"""
     ids = []
     for q in queries:
         s = api('search', {'part': 'id', 'type': 'video', 'order': 'viewCount', 'q': q,
                            'regionCode': REGION, 'relevanceLanguage': 'ja',
-                           'videoDuration': dur, 'safeSearch': 'moderate', 'maxResults': 25})
+                           'videoDuration': dur, 'safeSearch': 'moderate', 'maxResults': 50})
         for i in s.get('items', []):
             vid = i.get('id', {}).get('videoId')
             if vid and vid not in ids:         # 同じ動画が2クエリに出るので重複除去
                 ids.append(vid)
     vids = hydrate(ids)
     vids.sort(key=lambda x: -x['views'])       # videos.list は入力順を保証しないので必ず再ソート
-    return dedupe_titles(vids)[:LIST_N]
+    return cap_channel(dedupe_titles(vids))[:LIST_N]
 
 
 def norm_title(t):
