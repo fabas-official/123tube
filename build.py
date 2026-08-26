@@ -39,8 +39,18 @@ REGION, LIST_N = 'JP', 20
 #    → 上の段は「直近7日」を基準にし、足りなければ 14→30日まで**しか**広げない。
 #      30日より前は下の段(殿堂入り)の担当。上の段には二度と載せない。
 FRESH_DAYS = 7
-WIDEN_STEPS = (14, 30)  # 7日で足りない時に広げてよい段。ここが上の段の最大寿命
-TODAY_MAX_AGE = 30      # 最終防波堤。何があっても上の段にこれより古い動画は出さない
+TODAY_MAX_AGE = 30      # 最終防波堤。何があっても**上の段(ベスト3)**にこれより古い動画は出さない
+
+# ── 4位以下（ランキング表）を埋める枠 ───────────────────────────────
+# 内田さん指定 2026-08-27:「足らない分はお勧めみたいなやつで1ヶ月ぐらいで流行ってる動画を
+# ランクアップさせて20ぐらい埋めちゃえばいい。1位から4位までしかないのはまずい。
+# ただしその基準はあなたが考えて、人が見たいと思うやつを入れて」
+#   → 検索は**この31日の窓で1回だけ**投げ、そこから
+#       ベスト3 = 上限(旬14日/通常30日)以内だけ
+#       4位以下 = 残り全部を「おすすめ順」で
+#     に振り分ける。7日→14日→30日と何度も投げていた以前より**検索回数はむしろ減る**。
+FILL_DAYS = 31
+FILL_MIN_VIEWS = 2000   # これ未満は「おすすめ」として並べるには弱いので入れない
 _last_window = ''       # 直近の theme_videos が実際に使った期間（タブの説明に出す）
 _last_mode = ''         # 直近の rank_today が実際に使った並べ方（同上）       # 90日で足りないジャンルを救う2段目。歴代へ飛ぶ前にここを挟む
 FALLBACK_MAX = 3        # 期間指定なしでの補完を許す最大テーマ数（検索の日次別枠を守るため）
@@ -51,13 +61,21 @@ FALLBACK_MAX = 3        # 期間指定なしでの補完を許す最大テーマ
 # search.list(100ユニット + 別枠の日次上限) を置き換えるので、鮮度と節約が同時に達成できる。
 # 2026-08-27 実測の公開日: ゲーム[1,1,1,1,2]日前 / ニュース[2,2,5,4,2] / エンタメ[3,5,4,1,1]。
 # ⚠️ 旅行(19)は日本リージョンで 404。カテゴリが無い棚は下の検索ルートに残す。
+# 値は**リスト**。1カテゴリで足りない棚は複数を束ねる。
+# 🚨 2026-08-27 実測（急上昇50件中、16:9カードに載る横動画の数）:
+#     エンタメ24=4本 / ペット15=6本 / スポーツ17=4本 / コメディ23=10本 / 映画アニメ1=8本
+#     音楽10=30本 / ゲーム20=50本 / ニュース25=38本 / 科学技術28=32本
+#   エンタメの急上昇は**大半がShorts**で、そのままだとベスト3すら埋まらない（実際4本になった）。
+#   内田さん「エンタメみたいな感じで大丈夫」「Yahooトピックスを参考にするのが一番いい」に沿って、
+#   エンタメ=24+23+1（エンタメ＋コメディ＋映画アニメ）で束ねて母数を確保する。
 CATEGORY = {
-    'news':     '25',   # ニュース＆政治
-    'ongaku':   '10',   # 音楽
-    'game':     '20',   # ゲーム
-    'omoshiro': '23',   # コメディ
-    'geinou':   '24',   # エンタメ
-    'kawaii':   '15',   # ペット＆動物
+    'news':     ['25'],            # ニュース＆政治（38本＝単独で足りる）
+    'ongaku':   ['10'],            # 音楽（30本）
+    'game':     ['20'],            # ゲーム（50本）
+    'omoshiro': ['23', '1'],       # コメディ＋映画アニメ
+    'geinou':   ['24', '23', '1'], # エンタメ＋コメディ＋映画アニメ
+    'kawaii':   ['15'],            # ペット＆動物（6本・4位以下は検索で補完）
+    'sugoi':    ['28', '17'],      # 科学技術＋スポーツ（神業・世界記録の受け皿・36本）
 }
 # ⚠️ 2026-08-27 実測で外したもの:
 #   'anime': '1'  → 日本の映画＆アニメ急上昇はお笑い動画が大半で、棚と合わなかった
@@ -76,13 +94,13 @@ HOT_MAX_AGE = 14
 # カテゴリは棚より広い（例: 24=エンタメ には2ch系の語り動画も雑学も入る）。
 # そこで、カテゴリで取った「今日の急上昇」から棚に合う語を優先して並べ替える。
 # ⚠️ 絞りきらない。合致が少ない日は素のカテゴリ順に戻す＝棚を空にしないことを優先する。
-CATEGORY_PREFER = {
-    'geinou': ['芸能', '俳優', '女優', 'タレント', '歌手', 'ドラマ', '映画', 'テレビ', '番組',
-               '密着', '独占', '会見', '結婚', '引退', '熱愛', '文春', '舞台挨拶', '出演'],
-    'anime':  ['アニメ', 'PV', '劇場版', '声優', '原作', '放送', 'OP', 'ED', '主題歌', '第1話'],
-    'sugoi':  ['記録', '世界一', '世界記録', '神業', '職人', '圧巻', '驚異', '達成', '優勝',
-               '逆転', '伝説', 'スーパープレー', '技'],
-}
+# 🚨 語で絞り込むのをやめた（内田さん指定 2026-08-27）。
+#    「アイドル以外は全て入れちゃっていい。Yahooに上がるようなやつだったら全部いい。
+#      選定基準はバズってるやつでいい、今日話題の、みたいな。そうすれば窓口が増える」
+#    実際、語で絞ったら7本しか残らずスカスカになっていた。カテゴリ急上昇は
+#    そのまま「今日話題のもの」なので、**絞らずに全部入れる**のが正しい。
+#    タブ間でベスト3が被る件は main() の featured で処理済み。
+CATEGORY_EXCLUDE = {}
 
 SHORTS_MAX_SEC = 70     # これ以下は縦動画(Shorts)とみなす。カードが16:9なので絵が崩れる
 LONG_MIN_SEC   = 1200   # 作業用BGM等 'long' 相当の下限（20分）
@@ -112,8 +130,11 @@ _search_calls = 0       # 実際に投げた search.list の回数（クォー�
 # videoDuration で Shorts を除外している。理由=カードが16:9なので縦動画だと絵が崩れるため。
 THEMES = [
     # ── 1行目: 「今日の話題」系（人・出来事。日替わりがいちばん激しい棚を前に）
-    ('geinou',   '芸能界',     ['芸能人 密着 ドキュメント', '芸能人 番組 名場面'],     'medium',
-     'テレビの外の顔、現場の空気。芸能の"いま"を置いています。'),
+    # キーは geinou のまま（履歴・殿堂入りキャッシュの引き当てを壊さないため）。
+    # 表示名だけ「エンタメ」にした＝中身は YouTube のエンタメ急上昇そのもので、
+    # 芸能・歌手・バラエティ・話題の人まで全部この棚に入る（内田さん指定 2026-08-27）。
+    ('geinou',   'エンタメ',   ['話題 芸能 エンタメ', 'バラエティ 名場面 話題'],       'medium',
+     '芸能・歌手・バラエティまで、いま話題になっているものをまとめて。'),
     ('idol',     'アイドル',   ['アイドル ライブ パフォーマンス', 'アイドル 密着 バラエティ'], 'medium',
      'ステージも、その裏側も。推しがいる人のための棚です。'),
     ('news',     'ニュース',   ['ニュース 解説 わかりやすい', '今週 ニュース 振り返り 解説'],       'medium',
@@ -398,72 +419,42 @@ def older_than_a_day(asof, now):
         return True
 
 
-def theme_videos(queries, dur, steps=WIDEN_STEPS):
-    """複数クエリをマージして重複を除き、再生数順で上位を返す。
-    1語だけだと結果が偏るため、カテゴリごとに2クエリへ分けて広く拾う設計。
+def theme_videos(queries, dur, window=None):
+    """検索でそのジャンルの候補を集める。**窓は1つ、検索は1クエリ1回だけ**。
 
     🚨 期間を絞る理由（2026-08-26 実測で判明した最大の欠陥）:
       期間指定なしで order=viewCount を投げると、返るのは「歴代いちばん再生された動画」。
       実測では13タブ中9タブの公開日中央値が3年以上前（おもしろ・怖いは7.8年前）で、
       直近1年の動画はサイト全体の15%しかなかった。
       歴代ランキングは明日も同じ顔ぶれなので、**「毎日更新」が事実上ウソになる**。
-      → FRESH_DAYS 以内に公開された動画の中での再生数順にして、中身が実際に入れ替わるようにする。
 
-    フォールバック設計: 窓を絞ると候補が足りなくなるテーマがありうるので、
-    LIST_N の半分も集まらなければ期間指定なしで取り直す。
-    **絞りすぎて空になり、部分失敗ガードでサイトが1日まるごと更新されなくなるのを防ぐ**
-    （守りすぎて壊さない）。フォールバックが起きた日は必ずログに出す。
+    🚨 階段（7→14→30と何度も投げ直す方式）を 2026-08-27 に廃止した理由:
+      search.list には総合10,000ユニットとは別枠の**日次上限**があり、
+      投げ直すたびにそこが減る。実際その日のうちに枯れてビルドが carry-over に落ちた。
+      広い窓(FILL_DAYS=31日)で**1回だけ**取れば、狭い窓の結果はその部分集合なので、
+      あとは公開日で振り分けるだけで済む＝**同じ情報が3分の1の検索回数で手に入る**。
+      ベスト3の鮮度は rank_today(max_age=...) が、4位以下は topup() が受け持つ。
     """
     global _last_window
-    _last_window = '直近%d日' % FRESH_DAYS
+    days = window or FILL_DAYS
+    _last_window = '直近%d日' % days
     ids = []
     for q in queries:
-        for vid in search_ids(q, dur, FRESH_DAYS):
+        for vid in search_ids(q, dur, days):
             if vid not in ids:                 # 同じ動画が2クエリに出るので重複除去
                 ids.append(vid)
     # ここでは cap_channel を掛けない。プールを先に3本/chへ絞ると、
     # rank_today() が「その日の伸び」で選ぶ前に再生数順で切られてしまうため。
     vids = dedupe_titles(sorted(hydrate(ids), key=lambda x: -x['views']))
-
-    # 補完は「ほぼ空」のときだけ。20本に満たない日は、少ないまま出すほうが正しい
-    # （中身が新しいことのほうが、20本ぴったり並ぶことより価値がある）。
-    # search.list には総合10,000ユニットとは**別枠の日次上限**があり、
-    # 全テーマで補完を走らせると検索回数が倍になって先にそこが尽きる。
-    # 尽きると部分失敗ガードでサイトが1日まるごと更新されないので、補完回数自体に上限を置く。
-    global _fallback_used
-
-    # 階段は 7 → 14 → 30 日まで。**そこで止める**（2026-08-27 全面見直し）。
-    # 以前は 90→365→無制限まで下がっており、それが「今日の棚に5年前の動画」の直接の原因だった。
-    # 30日で足りないジャンルは、少ないまま出すほうが正しい。
-    # 歴代の名作は下の段（殿堂入り）が受け持っているので、上の段が痩せても失われるものは無い。
-    global _fallback_used
-    for step in steps:
-        if len(vids) >= 10:
-            break
-        if _fallback_used >= FALLBACK_MAX:
-            print('   └ 直近%d日で%d本。補完回数の上限に達しているのでこのまま出す'
-                  % (FRESH_DAYS, len(vids)))
-            break
-        _fallback_used += 1
-        print('   └ 直近%d日では%d本。直近%d日まで広げて補完（%d/%d回目）'
-              % (FRESH_DAYS, len(vids), step, _fallback_used, FALLBACK_MAX))
-        _last_window = '直近%d日' % step
-        for q in queries:
-            for vid in search_ids(q, dur, step):
-                if vid not in ids:
-                    ids.append(vid)
-        vids = dedupe_titles(sorted(hydrate(ids), key=lambda x: -x['views']))
-
-    if len(vids) < LIST_N:
-        print('   └ %s の該当は%d本（20本に満たないが、新しさを優先してこのまま出す）'
-              % (_last_window, len(vids)))
-    return vids                                    # 並べ替えと20本への絞り込みは rank_today() が行う
+    fresh = len([v for v in vids if age_days(v) <= TODAY_MAX_AGE])
+    print('   └ 直近%d日で%d本（うち%d日以内=%d本）' % (days, len(vids), TODAY_MAX_AGE, fresh))
+    return vids                                # 振り分けは rank_today() と topup() が行う
 
 
-_cat_key = ''           # いま処理中の棚のキー（CATEGORY_PREFER の引き当てに使う）
+_cat_key = ''           # いま処理中の棚のキー（CATEGORY_EXCLUDE の引き当てに使う）
 
 
-def category_videos(cat, dur):
+def category_videos(cats, dur):
     """カテゴリ別の「今日の急上昇」。**検索枠を一切使わず1ユニット**で、
     YouTube 自身が今日いちばん伸びていると判定した並びがそのまま返る。
 
@@ -473,30 +464,34 @@ def category_videos(cat, dur):
     """
     global _last_window
     _last_window = '今日の急上昇（カテゴリ別）'
-    v = api('videos', {'part': 'id', 'chart': 'mostPopular', 'videoCategoryId': cat,
-                       'regionCode': REGION, 'maxResults': 50})
-    vids = hydrate([i['id'] for i in v.get('items', [])])
-    # videoDuration の絞り込みが使えないエンドポイントなので、長さはここで自前で掛ける
+    if isinstance(cats, str):
+        cats = [cats]
+    ids = []
+    for c in cats:
+        try:
+            v = api('videos', {'part': 'id', 'chart': 'mostPopular', 'videoCategoryId': c,
+                               'regionCode': REGION, 'maxResults': 50})
+        except Exception as e:
+            # 1カテゴリが落ちても他で続ける（旅行19のようにJPで404になるものがある）
+            print('   └ カテゴリ%s は取得できず: %s' % (c, str(e)[:60]))
+            continue
+        for i in v.get('items', []):
+            if i['id'] not in ids:
+                ids.append(i['id'])
+    vids = hydrate(ids)
     if dur == 'long':
         vids = [x for x in vids if x.get('_secs', 0) >= LONG_MIN_SEC]
     else:
         vids = [x for x in vids if x.get('_secs', 0) > SHORTS_MAX_SEC]
-    # 長さが70秒を超えていても #shorts と名乗っている動画は縦のことが多く、
-    # 16:9のカードだと上下が切れる。タイトルの自己申告を信じて外す（2026-08-27）。
+    # 70秒超でも #shorts と名乗る動画は縦のことが多く、16:9カードだと上下が切れる
     vids = [x for x in vids if '#shorts' not in x['title'].lower()]
     vids = dedupe_titles(vids)
-
-    # 棚に合う語を先頭へ寄せる。合致が5本未満の日は素の急上昇順のまま出す
-    # （絞りすぎて空にするより、少しジャンルがぶれても今日のものを出すほうがいい）。
-    pref = CATEGORY_PREFER.get(_cat_key or '')
-    if pref:
-        hit = [v for v in vids if any(w in v['title'] for w in pref)]
-        if len(hit) >= 5:
-            rest = [v for v in vids if v not in hit]
-            print('   └ 棚に合う語で%d本を優先（残り%d本はそのまま後ろへ）' % (len(hit), len(rest)))
-            vids = hit + rest
-        else:
-            print('   └ 棚に合う語は%d本のみ。素の急上昇順で出す' % len(hit))
+    ng = CATEGORY_EXCLUDE.get(_cat_key or '')
+    if ng:
+        kept = [v for v in vids if not any(w.lower() in v['title'].lower() for w in ng)]
+        if len(kept) >= 5:
+            print('   └ 他タブ担当の%d本を除外（%d→%d本）' % (len(vids) - len(kept), len(vids), len(kept)))
+            vids = kept
     return vids
 
 
@@ -557,6 +552,63 @@ def rank_today(pool, hist, hof_ids, keep_order=False, max_age=TODAY_MAX_AGE):
     print('   └ 上の段: %s / 候補%d本→%d本（殿堂入り除外%d本）'
           % (mode, len(pool), len(out), len(pool) - len(live)))
     return out
+
+
+def osusume_score(v):
+    """4位以下に並べる順番＝「人が見たいと思うか」をPMの基準で数値にしたもの。
+
+    1) 主軸は **勢い（1日あたりの再生数）**。総再生数で並べると古い動画ほど有利になり、
+       それが今回の「5年前の動画が1位」の直接の原因だった。1日あたりに直せば、
+       3日で10万回の動画が、300年かけて50万回の動画に正しく勝つ。
+    2) **コメント率**を軽く加点する。再生されただけでなく人が反応した＝話題になっている証拠。
+       ただし主役はあくまで勢いなので、効き目は最大1.3倍までに抑える
+       （コメント欄が荒れているだけの動画を上げないため）。
+    3) 同じ勢いなら**新しいほう**をわずかに上にする。毎日見にくる人にとっては、
+       昨日と同じ顔ぶれが並ぶことがいちばんの離脱理由になる。
+    """
+    days = max(1, age_days(v))
+    if days >= 10 ** 5:                       # 公開日が読めない動画は最下位へ
+        return 0.0
+    per_day = v['views'] / float(days)
+    rate = (v.get('comments', 0) / float(v['views'])) if v.get('views') else 0.0
+    engage = 1.0 + min(0.3, rate * 100)       # コメント率1%で頭打ちの+30%
+    recency = 1.0 if days <= 7 else max(0.85, 1.0 - (days - 7) * 0.006)
+    return per_day * engage * recency
+
+
+_used_ids = set()       # このビルドで既にどこかのタブに出した動画（並びの重複を減らす用）
+
+
+def demote_used(vids, keep_head=0):
+    """既に他のタブへ出した動画を後ろへ回す。**消さずに順番を下げるだけ**。
+    カテゴリを束ねるとエンタメとおもしろのように候補が重なる棚が出るので、
+    せめて並び順が同じにならないようにする（消すと棚が痩せるので消さない）。"""
+    head, tail = vids[:keep_head], vids[keep_head:]
+    unused = [v for v in tail if v['videoId'] not in _used_ids]
+    used = [v for v in tail if v['videoId'] in _used_ids]
+    return head + unused + used
+
+
+def topup(vids, pool, hof, want=LIST_N):
+    """ベスト3の鮮度はそのままに、4位以下を「おすすめ順」で20位まで埋める。
+
+    pool は31日の窓で取った候補一式。すでに載っているものと殿堂入りを除き、
+    再生数が極端に少ないものも外したうえで osusume_score の高い順に足す。
+    cap_channel は **足したあとの全体**に掛ける。ベスト3が先頭にあるので、
+    先に確定した上位は必ず残り、同じチャンネルばかりが下に並ぶことだけを防げる。"""
+    if len(vids) >= want:
+        return vids
+    have = set(v['videoId'] for v in vids)
+    cand = [v for v in pool
+            if v['videoId'] not in have and v['videoId'] not in hof
+            and v.get('views', 0) >= FILL_MIN_VIEWS]
+    if not cand:
+        return vids
+    cand.sort(key=lambda x: -osusume_score(x))
+    merged = cap_channel(vids + cand)[:want]
+    print('   └ 4位以下を直近%d日のおすすめで補完: %d本 → %d本'
+          % (FILL_DAYS, len(vids), len(merged)))
+    return merged
 
 
 def norm_title(t):
@@ -1035,33 +1087,33 @@ def main():
                 hot = key in HOT_KEYS                     # 旬タブ=情報の鮮度が命
                 cap = HOT_MAX_AGE if hot else TODAY_MAX_AGE
                 cat = CATEGORY.get(key)
+                hofset = hof_ids.get(key, set())
+                fill = []                                # 4位以下を埋めるための候補
                 if cat:
-                    # 検索を使わず1ユニット。YouTube判定の「今日の急上昇」をそのまま採用する
+                    # カテゴリがある棚は検索を使わず1ユニット。急上昇の並びをそのまま使う
                     globals()['_cat_key'] = key
                     pool = category_videos(cat, dur)
-                    # 急上昇の非Shortsは日によって数本しか無い。ベスト3は急上昇のまま残し、
-                    # 4位以下だけ検索で継ぎ足してランキング表を埋める。
-                    # 検索が尽きていても**ベスト3は必ず出る**ので、ここは失敗しても続行する。
-                    if len(pool) < LIST_N and q:
-                        have = set(v['videoId'] for v in pool)
+                    vids = rank_today(pool, hist, hofset, keep_order=True, max_age=cap)
+                    # 急上昇の非Shortsは日によって数本しか無い（実測: かわいい6本）。
+                    # ベスト3は急上昇のまま残し、4位以下だけ検索のおすすめで埋める。
+                    # 検索が尽きていても**ベスト3は必ず出る**ので、失敗しても続行する。
+                    if len(vids) < LIST_N and q:
                         try:
-                            extra = [v for v in theme_videos(q, dur, (cap,))
-                                     if v['videoId'] not in have]
-                            if extra:
-                                print('   └ 急上昇%d本＋検索%d本で4位以下を補完' % (len(pool), len(extra)))
-                                pool = pool + extra
+                            fill = theme_videos(q, dur)
                         except Exception as e:
-                            print('   └ 補完の検索は使えず急上昇%d本のみ（%s）'
-                                  % (len(pool), str(e)[:60]))
-                        # main() 内で代入するとローカル変数になってしまうので globals 経由で戻す
+                            print('   └ 4位以下の補完は検索が使えず見送り（%s）' % str(e)[:60])
                         globals()['_last_window'] = '今日の急上昇（カテゴリ別）'
-                    vids = rank_today(pool, hist, hof_ids.get(key, set()),
-                                      keep_order=True, max_age=cap)
                 else:
-                    # カテゴリが無い棚は検索。旬タブは 7→14 まで、それ以外は 7→14→30
-                    steps = (HOT_MAX_AGE,) if hot else WIDEN_STEPS
-                    pool = theme_videos(q, dur, steps)
-                    vids = rank_today(pool, hist, hof_ids.get(key, set()), max_age=cap)
+                    # カテゴリが無い棚は検索。**31日の窓で1回だけ**投げ、
+                    # ベスト3は上限(旬14日/通常30日)で絞り、残りをそのまま4位以下に回す。
+                    pool = theme_videos(q, dur)
+                    vids = rank_today(pool, hist, hofset, max_age=cap)
+                    fill = pool
+                if fill:
+                    vids = topup(vids, fill, hofset)
+                vids = demote_used(vids)
+                for v in vids:
+                    _used_ids.add(v['videoId'])
                 how = '%s／%s' % (_last_window, _last_mode)
         except Exception as e:                      # 1テーマ失敗で全体を落とさない
             print('NG %s: %s' % (label, str(e)[:160]))
