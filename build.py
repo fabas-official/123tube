@@ -20,12 +20,21 @@ YouTube API Services 規約の遵守点:
 
 クォータ: search.list=100u / videos.list=1u / mostPopular=1u
   → 検索21本 + 各種 = 約2,120u（1日上限10,000）
+  ⚠️ search.list には総合10,000とは**別枠の日次上限**('Search Queries per day')がある。
+     ここが先に尽きると chart=mostPopular は通るのに search だけ429になる。
+     期間指定の補完は FALLBACK_MAX 件までに制限してこれを守る。
 """
 import json, os, re, sys, html, datetime, urllib.parse, urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 API_KEY = os.environ.get('YT_API_KEY', '').strip()
 REGION, LIST_N = 'JP', 20
+# ジャンルタブが「歴代ランキング」になって中身が入れ替わらない問題への対処。
+# この日数以内に公開された動画の中での再生数順にする（2026-08-26 追加）。
+# 広げるほど殿堂入り寄り・狭めるほど日替わり寄りになる。ここ1箇所で調整できる。
+FRESH_DAYS = 90
+FALLBACK_MAX = 2        # 期間指定なしでの補完を許す最大テーマ数（検索の日次別枠を守るため）
+_fallback_used = 0      # 1回のビルド内で使った補完回数
 CHANNEL_ID = 'UCGkI3Cpu_a6yvizyqQLbKKA'          # うっちーPとエンタメの世界【大人の秘密基地】
 SITE_URL = 'https://fabas-official.github.io/123tube/'
 
@@ -185,25 +194,68 @@ def cap_channel(vids, cap=3):
     return out
 
 
+def search_ids(q, dur, days=None):
+    """1クエリ分の動画IDを返す。days を指定するとその日数以内に公開された動画に限定する。
+
+    maxResults=50 は search.list の上限。**search.list は1回100ユニット固定で
+    maxResults を増やしても消費は変わらない**ので、候補は取れるだけ取る。
+    """
+    p = {'part': 'id', 'type': 'video', 'order': 'viewCount', 'q': q,
+         'regionCode': REGION, 'relevanceLanguage': 'ja',
+         'videoDuration': dur, 'safeSearch': 'moderate', 'maxResults': 50}
+    if days:
+        after = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=days)
+        p['publishedAfter'] = after.strftime('%Y-%m-%dT%H:%M:%SZ')
+    s = api('search', p)
+    return [i['id']['videoId'] for i in s.get('items', [])
+            if i.get('id', {}).get('videoId')]
+
+
 def theme_videos(queries, dur):
     """複数クエリをマージして重複を除き、再生数順で上位を返す。
     1語だけだと結果が偏るため、カテゴリごとに2クエリへ分けて広く拾う設計。
 
-    maxResults=50 は search.list の上限。**search.list は1回100ユニット固定で
-    maxResults を増やしても消費は変わらない**ので、候補は取れるだけ取る。
-    cap_channel で寡占チャンネルを削ったあとに20本を埋めるには候補数が要る。"""
+    🚨 期間を絞る理由（2026-08-26 実測で判明した最大の欠陥）:
+      期間指定なしで order=viewCount を投げると、返るのは「歴代いちばん再生された動画」。
+      実測では13タブ中9タブの公開日中央値が3年以上前（おもしろ・怖いは7.8年前）で、
+      直近1年の動画はサイト全体の15%しかなかった。
+      歴代ランキングは明日も同じ顔ぶれなので、**「毎日更新」が事実上ウソになる**。
+      → FRESH_DAYS 以内に公開された動画の中での再生数順にして、中身が実際に入れ替わるようにする。
+
+    フォールバック設計: 窓を絞ると候補が足りなくなるテーマがありうるので、
+    LIST_N の半分も集まらなければ期間指定なしで取り直す。
+    **絞りすぎて空になり、部分失敗ガードでサイトが1日まるごと更新されなくなるのを防ぐ**
+    （守りすぎて壊さない）。フォールバックが起きた日は必ずログに出す。
+    """
     ids = []
     for q in queries:
-        s = api('search', {'part': 'id', 'type': 'video', 'order': 'viewCount', 'q': q,
-                           'regionCode': REGION, 'relevanceLanguage': 'ja',
-                           'videoDuration': dur, 'safeSearch': 'moderate', 'maxResults': 50})
-        for i in s.get('items', []):
-            vid = i.get('id', {}).get('videoId')
-            if vid and vid not in ids:         # 同じ動画が2クエリに出るので重複除去
+        for vid in search_ids(q, dur, FRESH_DAYS):
+            if vid not in ids:                 # 同じ動画が2クエリに出るので重複除去
                 ids.append(vid)
-    vids = hydrate(ids)
-    vids.sort(key=lambda x: -x['views'])       # videos.list は入力順を保証しないので必ず再ソート
-    return cap_channel(dedupe_titles(vids))[:LIST_N]
+    vids = cap_channel(dedupe_titles(sorted(hydrate(ids), key=lambda x: -x['views'])))
+
+    # 補完は「ほぼ空」のときだけ。20本に満たない日は、少ないまま出すほうが正しい
+    # （中身が新しいことのほうが、20本ぴったり並ぶことより価値がある）。
+    # search.list には総合10,000ユニットとは**別枠の日次上限**があり、
+    # 全テーマで補完を走らせると検索回数が倍になって先にそこが尽きる。
+    # 尽きると部分失敗ガードでサイトが1日まるごと更新されないので、補完回数自体に上限を置く。
+    # 🚨 0本だけは FALLBACK_MAX を無視して必ず救う。
+    #    main() は「1テーマでも空なら何も書かずに exit(1)」なので、
+    #    1タブの空が **サイト全体を1日更新させない** ことに直結する。
+    global _fallback_used
+    if not vids or (len(vids) < 5 and _fallback_used < FALLBACK_MAX):
+        _fallback_used += 1
+        print('   └ 直近%d日では%d本しか集まらず、期間指定なしで補完（%d/%d回目）'
+              % (FRESH_DAYS, len(vids), _fallback_used, FALLBACK_MAX))
+        for q in queries:
+            for vid in search_ids(q, dur):
+                if vid not in ids:
+                    ids.append(vid)
+        vids = cap_channel(dedupe_titles(sorted(hydrate(ids), key=lambda x: -x['views'])))
+    elif len(vids) < LIST_N:
+        print('   └ 直近%d日の該当は%d本（20本に満たないが、新しさを優先してこのまま出す）'
+              % (FRESH_DAYS, len(vids)))
+    return vids[:LIST_N]
 
 
 def norm_title(t):
@@ -397,6 +449,8 @@ def write_sitemap():
 # ---------------------------------------------------------------- main
 
 def main():
+    global _fallback_used
+    _fallback_used = 0
     if not API_KEY:
         print('FATAL: 環境変数 YT_API_KEY が未設定'); sys.exit(1)
     hist = json.load(open(HIST, encoding='utf-8')) if os.path.exists(HIST) else {}
