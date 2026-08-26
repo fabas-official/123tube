@@ -98,15 +98,17 @@ THEMES = [
      '心霊・怪談・都市伝説。ひとりで観る勇気がある人向け。'),
     ('itai',     '痛い',       ['失敗 転倒 痛い', 'やらかし 失敗集'],                'medium',
      '見てるこっちが痛い、やらかしの記録。'),
-    ('kane',     '借金・お金', ['借金 破産 貧乏', '節約 投資 失敗'],                 'medium',
-     'お金の失敗談から節約・投資まで。他人事じゃない話。'),
+    # 借金は独立させず「お金」に統合。守り(節約・借金)と攻め(投資)の2クエリで
+    # 家計から資産形成までを1つの棚に収める（内田さん指示 2026-08-27）。
+    ('kane',     'お金',       ['節約 貯金 借金 返済', '投資 NISA iDeCo 初心者 解説'], 'medium',
+     '節約・貯金・借金の話から、NISA・iDeCoなどの投資まで。他人事じゃないお金の話。'),
     ('bgm',      '作業用BGM',  ['作業用BGM 集中'],                                  'long',
      '手を止めずに流しっぱなしでどうぞ。'),
 ]
 
 # タブのボタンでだけ使う短い呼び名。7個×2段に収めるための措置で、
 # 見出し・説明文では正式名称（THEMES の表示名）をそのまま使う。
-SHORT_LABEL = {'kane': 'お金', 'bgm': 'BGM', 'renai': '恋愛'}
+SHORT_LABEL = {'bgm': 'BGM', 'renai': '恋愛'}
 
 OWN_KEY, OWN_LABEL = 'ucchii', 'うっちーPの歌'
 OWN_NOTE = 'このサイトを作っている人が書いた歌です。作詞はぜんぶ本人。'
@@ -786,6 +788,10 @@ def render(d, hofc):
     ・中身は1面だけ出す。上下を同時に開くと縦に長くなりすぎるため
     """
     themes = {t['key']: t for t in d['themes']}
+    # ジャンル名を変えた日でも、台帳に残る古いラベルではなく今の定義を使う
+    for _k, _l, _q2, _d2, _n2 in THEMES:
+        if _k in themes:
+            themes[_k] = dict(themes[_k], label=_l, note=_n2)
     genres = [(k, l) for (k, l, _q, _dur, _n) in THEMES if k in themes]
 
     mega_t = ('<button class="tab mega mtrend on" data-g="today" data-t="trend">'
