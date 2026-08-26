@@ -2927,7 +2927,7 @@
    ]
   },
   "geinou": {
-   "updated": "2000-01-01",
+   "updated": "2026-08-26",
    "videos": [
     {
      "videoId": "-9XgELNF9l4",
@@ -3149,7 +3149,8 @@
      "thumb": "https://i.ytimg.com/vi/YZJUVd-olhg/mqdefault.jpg",
      "rank": 20
     }
-   ]
+   ],
+   "force": true
   },
   "idol": {
    "updated": "2026-08-26",
@@ -3377,7 +3378,7 @@
    ]
   },
   "news": {
-   "updated": "2000-01-01",
+   "updated": "2026-08-26",
    "videos": [
     {
      "videoId": "1_gmmFLP-w4",
@@ -3599,7 +3600,8 @@
      "thumb": "https://i.ytimg.com/vi/aSoc4nrmGug/mqdefault.jpg",
      "rank": 20
     }
-   ]
+   ],
+   "force": true
   }
  }
 }

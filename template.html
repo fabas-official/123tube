@@ -32,11 +32,15 @@
 :root{--bg:#f7f4ef;--card:#fff;--tx:#211e1a;--sub:#7a6f64;--line:#e4ddd2;
       --ac:#dc4034;--ac-s:#fdeceb;--own:#6f61c0;--own-s:#f0eefb;
       --gold:#c9922a;--gold-s:#fbf3df;--silver:#9c9ca6;--bronze:#bb7c47;
+      /* 塗りつぶした上に文字を載せる用。線や文字色に使う色とは別に持つ。
+         ダークでは線用の色を明るくするので、そのまま白文字を載せると読めなくなる。 */
+      --ac-fill:#c8372c;--on-ac:#fff;--own-fill:#6f61c0;--on-own:#fff;--on-gold:#2a1d05;
       --sh:0 3px 14px rgba(70,50,25,.09);--sh2:0 10px 28px rgba(70,50,25,.16)}
 @media(prefers-color-scheme:dark){
   :root{--bg:#141210;--card:#1e1b17;--tx:#f2eee8;--sub:#a99d90;--line:#332c24;
         --ac:#f2685c;--ac-s:#3a1f1c;--own:#a496e8;--own-s:#251f3d;
         --gold:#e5b455;--gold-s:#372c12;--silver:#b6b6bd;--bronze:#c98a52;
+        --ac-fill:#a8291f;--own-fill:#4e3f9e;--on-gold:#241a06;
         --sh:0 3px 16px rgba(0,0,0,.45);--sh2:0 10px 30px rgba(0,0,0,.55)}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--tx);line-height:1.8;
@@ -86,15 +90,15 @@ header{padding:34px 20px 20px;text-align:center}
 .mtrend.on .mcta{color:var(--ac)}
 .mown.on .mcta{color:var(--own)}
 .tab.mtrend{border-color:var(--ac);background:var(--card)}
-.mtrend .mtag{background:var(--ac)}
+.mtrend .mtag{background:var(--ac-fill);color:var(--on-ac)}
 .tab.mtrend:hover{background:var(--ac-s)}
-.mtrend.on{background:var(--ac);border-color:var(--ac);color:#fff;box-shadow:var(--sh2)}
+.mtrend.on{background:var(--ac-fill);border-color:var(--ac-fill);color:var(--on-ac);box-shadow:var(--sh2)}
 .mtrend.on .mtag{background:rgba(255,255,255,.24)}
 .mtrend.on i{color:rgba(255,255,255,.88)}
 .tab.mown{border-color:var(--own);background:var(--card)}
-.mown .mtag{background:var(--own)}
+.mown .mtag{background:var(--own-fill);color:var(--on-own)}
 .tab.mown:hover{background:var(--own-s)}
-.mown.on{background:var(--own);border-color:var(--own);color:#fff;box-shadow:var(--sh2)}
+.mown.on{background:var(--own-fill);border-color:var(--own-fill);color:var(--on-own);box-shadow:var(--sh2)}
 .mown.on .mtag{background:rgba(255,255,255,.24)}
 .mown.on i{color:rgba(255,255,255,.88)}
 
@@ -105,8 +109,8 @@ header{padding:34px 20px 20px;text-align:center}
 .tabrow.hof{border-color:var(--gold)}
 .rowlabel{flex:0 0 auto;display:flex;align-items:baseline;justify-content:center;gap:9px;
           line-height:1.3;padding:8px 12px;border-radius:12px;color:#fff}
-.today .rowlabel{background:var(--ac)}
-.hof .rowlabel{background:var(--gold)}
+.today .rowlabel{background:var(--ac-fill);color:var(--on-ac)}
+.hof .rowlabel{background:var(--gold);color:var(--on-gold)}
 .rowlabel b{font-size:14.5px;font-weight:900;white-space:nowrap;letter-spacing:0}
 .rowlabel i{font-style:normal;font-size:12px;white-space:nowrap;opacity:.9;font-weight:500}
 /* 🚨 横スクロールにしない。棒を動かさないと見えないジャンルは「無い」のと同じ。
@@ -120,9 +124,9 @@ header{padding:34px 20px 20px;text-align:center}
      background:var(--bg);color:var(--tx);font-size:14px;font-weight:700;white-space:nowrap;
      overflow:hidden;font-family:inherit;transition:.14s}
 .today .tab:hover{border-color:var(--ac);color:var(--ac);background:var(--ac-s)}
-.today .tab.on{background:var(--ac);border-color:var(--ac);color:#fff}
+.today .tab.on{background:var(--ac-fill);border-color:var(--ac-fill);color:var(--on-ac)}
 .hof .tab:hover{border-color:var(--gold);color:var(--gold);background:var(--gold-s)}
-.hof .tab.on{background:var(--gold);border-color:var(--gold);color:#fff}
+.hof .tab.on{background:var(--gold);border-color:var(--gold);color:var(--on-gold)}
 @media(max-width:1149px){
   .tab.mega{padding:13px}
 }
@@ -131,10 +135,10 @@ header{padding:34px 20px 20px;text-align:center}
 .panes{margin-top:4px}
 .pane{display:none}.pane.on{display:block}
 .lead{padding:6px 0 22px;text-align:center}
-.lbadge{display:inline-block;font-size:12.5px;font-weight:900;letter-spacing:.14em;color:#fff;
-        background:var(--ac);border-radius:999px;padding:3px 14px;margin:0 0 10px}
-.lbadge.gold{background:var(--gold)}
-.lbadge.own{background:var(--own)}
+.lbadge{display:inline-block;font-size:12.5px;font-weight:900;letter-spacing:.14em;color:var(--on-ac);
+        background:var(--ac-fill);border-radius:999px;padding:3px 14px;margin:0 0 10px}
+.lbadge.gold{background:var(--gold);color:var(--on-gold)}
+.lbadge.own{background:var(--own-fill);color:var(--on-own)}
 .lead h2{margin:0 0 8px;font-size:clamp(24px,4.8vw,33px);font-weight:900;letter-spacing:.02em;line-height:1.35}
 .lead p{margin:0 auto;max-width:680px;color:var(--sub);font-size:15px}
 .top3{display:grid;gap:18px;grid-template-columns:1fr}
@@ -148,7 +152,7 @@ header{padding:34px 20px 20px;text-align:center}
 .tw{position:relative;aspect-ratio:16/9;background:#000}
 .tw img{width:100%;height:100%;object-fit:cover;display:block}
 .rk{position:absolute;top:-2px;left:12px;width:35px;height:44px;display:grid;place-items:center;
-    font-size:20px;font-weight:900;color:#fff;clip-path:polygon(0 0,100% 0,100% 100%,50% 82%,0 100%)}
+    font-size:20px;font-weight:900;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6);clip-path:polygon(0 0,100% 0,100% 100%,50% 82%,0 100%)}
 .gold .rk{background:var(--gold)}.silver .rk{background:var(--silver)}.bronze .rk{background:var(--bronze)}
 .dur{position:absolute;right:7px;bottom:7px;background:rgba(0,0,0,.84);color:#fff;
      font-size:12.5px;font-weight:500;padding:1px 7px;border-radius:5px}
@@ -182,7 +186,7 @@ header{padding:34px 20px 20px;text-align:center}
 .fmt{display:block;padding:0 18px 18px}
 @media(min-width:720px){.fmt{padding:18px 20px 18px 0}}
 .fmt em{display:inline-block;font-style:normal;font-size:11px;font-weight:900;letter-spacing:.12em;
-        color:#fff;background:var(--own);border-radius:999px;padding:3px 12px;margin:0 0 10px}
+        color:var(--on-own);background:var(--own-fill);border-radius:999px;padding:3px 12px;margin:0 0 10px}
 .fmt b{display:block;font-size:18px;line-height:1.55;font-weight:700;margin:0 0 8px}
 .fnote{display:block;font-size:14.5px;color:var(--sub);line-height:1.7;margin:0 0 9px;font-weight:500}
 .fviews{display:block;font-size:16.5px;font-weight:900;color:var(--own)}
@@ -201,9 +205,14 @@ header{padding:34px 20px 20px;text-align:center}
 .more .rows{border:0;border-top:1.5px solid var(--line);border-radius:0}
 .hnote{margin:16px 0 0;color:var(--sub);font-size:14px;text-align:center;font-weight:500}
 .rows{border:1.5px solid var(--line);border-radius:14px;overflow:hidden;background:var(--card)}
-.row{display:grid;grid-template-columns:34px 108px 1fr;gap:10px;align-items:center;
-     padding:13px 12px;border-bottom:1px solid var(--line)}
-@media(min-width:700px){.row{grid-template-columns:46px 128px 1fr 172px}}
+.row{display:grid;grid-template-columns:30px 92px 1fr;gap:9px;align-items:center;
+     padding:13px 10px;border-bottom:1px solid var(--line)}
+/* スマホでは4列目が置けないので、再生回数などをタイトルの下へ回して必ず見せる */
+.row>.n,.row>.rtw{grid-row:1/3}
+.row>.ri{grid-row:1}
+.row>.rs{grid-row:2;grid-column:3}
+@media(min-width:700px){.row{grid-template-columns:46px 128px 1fr 172px;gap:10px;padding:13px 12px}
+  .row>.n,.row>.rtw,.row>.ri,.row>.rs{grid-row:auto;grid-column:auto}}
 .row:last-child{border-bottom:0}
 .row:hover{background:var(--ac-s)}
 .row.hof:hover{background:var(--gold-s)}
@@ -217,11 +226,15 @@ header{padding:34px 20px 20px;text-align:center}
 .ri b{font-size:15.5px;line-height:1.55;font-weight:700;
       display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .ri em{display:block;font-style:normal;font-size:13px;color:var(--sub);font-weight:500}
-.rs{display:none}
-@media(min-width:700px){.rs{display:block;text-align:right}}
-.rs u{display:block;text-decoration:none;font-size:17px;font-weight:900}
-.rs i{display:block;font-style:normal;font-size:12.5px;color:var(--sub);font-weight:500}
-.up{color:#2e9e63;font-weight:900}.flat{color:var(--sub)}
+.rs{display:block;margin-top:2px}
+.rs u{display:inline;text-decoration:none;font-size:14px;font-weight:900}
+.rs i{display:inline;font-style:normal;font-size:12.5px;color:var(--sub);font-weight:500}
+.rs i::before{content:" ／ "}
+@media(min-width:700px){.rs{text-align:right;margin-top:0}
+  .rs u{display:block;font-size:17px}
+  .rs i{display:block}
+  .rs i::before{content:""}}
+.up{color:#2e9e63;font-weight:900}.down{color:var(--ac);font-weight:900}.flat{color:var(--sub)}
 
 footer{border-top:1px solid var(--line);padding:32px 20px 54px;text-align:center;
        color:var(--sub);font-size:13.5px;line-height:2.05}
@@ -237,12 +250,15 @@ footer a{color:var(--ac);font-weight:700}
 <footer>
   <p>最終更新: __UPD__ ／ 対象地域: 日本 ／ 毎日自動更新<br>
   再生回数・コメント数は YouTube Data API v3 から取得した、取得時点の公式数値です。<br>
-  <b>今日のベスト3（赤）</b>＝直近90日に公開された動画のうち、前日から再生回数がいちばん伸びたもの順です。総合は当日の急上昇そのものです。<br>
+  <b>今日のベスト3（赤）</b>＝原則、直近90日に公開された動画のうち前日から再生回数がいちばん伸びたもの順です。本数が足りないジャンルは対象期間を広げ、前日比のデータが揃わない日は再生回数順にします。<b>その日に実際に使った条件は各タブに表示します。</b>総合は当日の急上昇そのものです。<br>
   <b>殿堂入り（金）</b>＝公開日を問わない歴代の再生回数順です。1日2ジャンルずつ順番に取り直しています。<br>
   今日の棚には殿堂入りの動画を出さないようにしているので、同じ動画が上下に並ぶことはありません。<br>
   同じチャンネルばかりが並ばないよう、1つの棚に同じチャンネルは3本までにしています。大きく出るベスト3の枠は、必ず違うチャンネルから選んでいます。<br>
   日本で再生できない動画（削除・非公開・地域制限・年齢制限）は載せていません。<br>
   動画の再生は YouTube 上で行われます。当サイトは動画を保存・再配信していません。</p>
+  <p>当サイトは動画情報の取得に YouTube API サービスを利用しています。取得した情報は表示のために保持するだけで、閲覧者の個人情報は収集していません。<br>
+  <a href="https://www.youtube.com/t/terms" target="_blank" rel="noopener">YouTube 利用規約</a>
+   ／ <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google プライバシーポリシー</a></p>
   <p><a href="https://www.youtube.com/channel/UCGkI3Cpu_a6yvizyqQLbKKA" target="_blank" rel="noopener">うっちーPとエンタメの世界</a>
    ／ <a href="https://fabas-official.github.io/" target="_blank" rel="noopener">Fabas 公式サイト</a></p>
 </footer>
@@ -257,12 +273,9 @@ document.querySelectorAll('.tab').forEach(function (b) {
     document.querySelectorAll('.pane').forEach(function (x) { x.classList.remove('on'); });
     b.classList.add('on');
     p.classList.add('on');
-    // ナビが画面の上へ流れているときだけ、ナビの頭まで戻す。
-    // 毎回ページ先頭へ飛ばすと、下の段を触っているのに吹き飛ばされて操作しづらい。
-    var nav = document.querySelector('.navwrap');
-    if (nav && nav.getBoundingClientRect().top < 0) {
-      nav.scrollIntoView({ block: 'start', behavior: 'smooth' });
-    }
+    // 押した結果として出てきた中身の先頭へ寄せる。
+    // ナビの頭へ戻していたが、それだと選んだ中身がそのまま画面の外に出てしまう。
+    p.scrollIntoView({ block: 'start', behavior: 'smooth' });
   });
 });
 </script>

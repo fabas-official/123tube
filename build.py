@@ -33,7 +33,9 @@ REGION, LIST_N = 'JP', 20
 # この日数以内に公開された動画の中での再生数順にする（2026-08-26 追加）。
 # 広げるほど殿堂入り寄り・狭めるほど日替わり寄りになる。ここ1箇所で調整できる。
 FRESH_DAYS = 90
-WIDEN_DAYS = 365       # 90日で足りないジャンルを救う2段目。歴代へ飛ぶ前にここを挟む
+WIDEN_DAYS = 365
+_last_window = ''       # 直近の theme_videos が実際に使った期間（タブの説明に出す）
+_last_mode = ''         # 直近の rank_today が実際に使った並べ方（同上）       # 90日で足りないジャンルを救う2段目。歴代へ飛ぶ前にここを挟む
 FALLBACK_MAX = 3        # 期間指定なしでの補完を許す最大テーマ数（検索の日次別枠を守るため）
 _fallback_used = 0      # 1回のビルド内で使った補完回数
 CHANNEL_ID = 'UCGkI3Cpu_a6yvizyqQLbKKA'          # うっちーPとエンタメの世界【大人の秘密基地】
@@ -51,8 +53,11 @@ INDEX = os.path.join(HERE, 'index.html')
 #     12ジャンル ÷ 2 = 6日で一周する＝全ジャンルが常に6日以内の鮮度。
 #     APIデータの保存は30日以内という規約もこれで満たす。
 # 消費は 2ジャンル × 2クエリ × 100u = 400u/日（1日上限10,000のうち4%）。
-HOF_PER_RUN = int(os.environ.get('HOF_PER_RUN', '2'))   # 初回の一括投入時だけ環境変数で増やす
-HOF_MAX_AGE_DAYS = 6
+HOF_PER_RUN = int(os.environ.get('HOF_PER_RUN', '3'))   # 初回の一括投入時だけ環境変数で増やす
+HOF_MAX_AGE_DAYS = 7    # 18ジャンル ÷ 3件/日 = 6日で一周。それに合わせた鮮度の上限
+HOF_FORCE_AGE = 20      # ここまで古くなったら、検索枠を惜しまず必ず1件は取り直す
+SEARCH_SOFT_CAP = 60    # 1回のビルドで殿堂入りに手を出してよい検索回数の上限
+_search_calls = 0       # 実際に投げた search.list の回数（クォータ判断はこれで行う）
 
 # (キー, 表示名, [検索語...], 長さ絞り込み, 説明文)
 # videoDuration で Shorts を除外している。理由=カードが16:9なので縦動画だと絵が崩れるため。
@@ -259,6 +264,8 @@ def search_ids(q, dur, days=None):
     if days:
         after = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=days)
         p['publishedAfter'] = after.strftime('%Y-%m-%dT%H:%M:%SZ')
+    global _search_calls
+    _search_calls += 1                             # 殿堂入りを回すかの判断に使う実消費カウンタ
     s = api('search', p)
     return [i['id']['videoId'] for i in s.get('items', [])
             if i.get('id', {}).get('videoId')]
@@ -330,6 +337,8 @@ def theme_videos(queries, dur):
     **絞りすぎて空になり、部分失敗ガードでサイトが1日まるごと更新されなくなるのを防ぐ**
     （守りすぎて壊さない）。フォールバックが起きた日は必ずログに出す。
     """
+    global _last_window
+    _last_window = '直近%d日' % FRESH_DAYS
     ids = []
     for q in queries:
         for vid in search_ids(q, dur, FRESH_DAYS):
@@ -352,6 +361,7 @@ def theme_videos(queries, dur):
         _fallback_used += 1
         print('   └ 直近%d日では%d本。直近%d日まで広げて補完（%d/%d回目）'
               % (FRESH_DAYS, len(vids), WIDEN_DAYS, _fallback_used, FALLBACK_MAX))
+        _last_window = '直近1年'
         for q in queries:
             for vid in search_ids(q, dur, WIDEN_DAYS):
                 if vid not in ids:
@@ -366,6 +376,7 @@ def theme_videos(queries, dur):
         _fallback_used += 1
         print('   └ まだ%d本。期間指定なしで補完（%d/%d回目）'
               % (len(vids), _fallback_used, FALLBACK_MAX))
+        _last_window = '公開日を問わず'
         for q in queries:
             for vid in search_ids(q, dur):
                 if vid not in ids:
@@ -396,13 +407,18 @@ def rank_today(pool, hist, hof_ids):
     for v in live:
         prev = hist.get(v['videoId'])
         v['delta'] = (v['views'] - prev) if isinstance(prev, int) else None
+    global _last_mode
     buzz = [v for v in live if isinstance(v.get('delta'), int) and v['delta'] > 0]
-    if len(buzz) >= LIST_N:
+    # 閾値を20本固定にすると、候補プールの小さいジャンルが永久に伸び順にならない。
+    # 「上位3枚を伸び順で埋められるだけの本数」があれば伸び順を採用する。
+    need = max(3, min(LIST_N, len(live) // 2))
+    if len(buzz) >= need:
         ordered = sorted(buzz, key=lambda x: -x['delta'])
-        mode = 'その日の伸び順'
+        mode = '前日からの伸び順'
     else:
         ordered = sorted(live, key=lambda x: -x['views'])
-        mode = '総再生数順（伸びのデータが%d本しか無いため）' % len(buzz)
+        mode = '再生回数順（前日比のデータが%d本しか無いため）' % len(buzz)
+    _last_mode = mode
     out = spread_top3(cap_channel(ordered))[:LIST_N]
     print('   └ 上の段: %s / 候補%d本→%d本（殿堂入り除外%d本）'
           % (mode, len(pool), len(out), len(pool) - len(live)))
@@ -513,7 +529,14 @@ def load_hof():
 
 
 def hof_age(entry):
-    """キャッシュ1件の古さ(日)。日付が壊れていたら「とても古い」扱いにして先に更新させる。"""
+    """キャッシュ1件の古さ(日)。日付が壊れていたら「とても古い」扱いにして先に更新させる。
+
+    🚨 2026-08-27: 以前は強制更新したいエントリの updated に '2000-01-01' を書いていたが、
+       その値が画面の「集計時点」にそのまま出て『26年前のランキング』に見えていた。
+       目印は表示に使わない 'force' キーで持ち、updated には本当の取得日だけを入れる。
+    """
+    if entry.get('force'):
+        return 9999
     try:
         y, m, d = [int(x) for x in entry.get('updated', '2000-01-01').split('-')]
         return (datetime.date.today() - datetime.date(y, m, d)).days
@@ -549,7 +572,7 @@ def refresh_hof(cache, allow):
         for r, v in enumerate(vids, 1):
             v['rank'] = r
             v.pop('delta', None)                 # 歴代に前日比は意味がないので持たない
-        cache[key] = {'updated': datetime.date.today().isoformat(), 'videos': vids}
+        cache[key] = {'updated': datetime.date.today().isoformat(), 'videos': vids}  # force は落とす
         done.append(label)
         print('   └ 殿堂入り更新 %s (%d本・前回から%s日)' % (label, len(vids),
               '初回' if age >= 9999 else age))
@@ -581,8 +604,11 @@ def commentary(v):
     yrs = days / 365.0
     span = (str(round(yrs, 1)) + '年') if yrs >= 1 else (str(days) + '日')
     s = '公開から' + span + 'で' + big(v['views']) + '。1日あたり約' + format(int(v['views'] / days), ',') + '回のペースです。'
-    if v.get('delta'):
-        s += ' 前日から+' + format(v['delta'], ',') + '回。'
+    d = v.get('delta')
+    if isinstance(d, int) and d > 0:
+        s += ' 前日から+' + format(d, ',') + '回。'
+    elif isinstance(d, int) and d < 0:
+        s += ' 前日から' + format(d, ',') + '回。'
     return s
 
 
@@ -600,9 +626,24 @@ def card(v):
             '<span class="btn">YouTubeで見る →</span></div></a>')
 
 
+def delta_html(v):
+    """前日比の表示。増・減・変化なし・データ無しを取り違えないようにする。
+
+    🚨 以前は `if v.get('delta')` の1本で、マイナスの日に「+-1,234」と出たうえ
+       上昇の緑が当たっていた。0（伸びていない）と None（測れていない）も同じ「—」だった。
+    """
+    d = v.get('delta')
+    if not isinstance(d, int):
+        return '<span class="flat">—</span>'
+    if d > 0:
+        return '<span class="up">+' + format(d, ',') + '</span>'
+    if d < 0:
+        return '<span class="down">−' + format(abs(d), ',') + '</span>'
+    return '<span class="flat">±0</span>'
+
+
 def row(v):
-    delta = ('<span class="up">+' + format(v['delta'], ',') + '</span>') if v.get('delta') \
-        else '<span class="flat">—</span>'
+    delta = delta_html(v)
     return ('<a class="row" href="https://www.youtube.com/watch?v=' + html.escape(v['videoId']) +
             '" target="_blank" rel="noopener">'
             '<span class="n">' + str(v['rank']) + '</span>'
@@ -661,15 +702,33 @@ def today_pane(t, on):
     stale = ('<br><small>※ ' + html.escape(t.get('asof', '')) +
              ' 時点のままです（本日の取得に失敗したため）</small>') if t.get('stale') else ''
     pin = feature(t['pinned']) if t.get('pinned') else ''
+    how = ('<br><small>' + html.escape(t['how']) + '</small>') if t.get('how') else ''
     rest = ''
     if len(vids) > 3:
         rest = ('<h3 class="rh">今日の 4位〜' + str(len(vids)) + '位</h3>'
                 '<div class="rows">' + ''.join(row(v) for v in vids[3:]) + '</div>')
     head = ('<div class="lead"><span class="lbadge">今日</span>'
             '<h2>' + html.escape(t['label']) + ' ベスト3</h2>'
-            '<p>' + html.escape(t['note']) + stale + '</p></div>')
+            '<p>' + html.escape(t['note']) + how + stale + '</p></div>')
     return pane('p-today-' + t['key'], on,
                 head + pin + '<div class="top3">' + ''.join(card(v) for v in vids[:3]) + '</div>' + rest)
+
+
+def asof_label(entry):
+    """「集計時点」に出してよい日付だけを返す。おかしな値は日付を出さない。
+
+    未来日・パース不能・極端に古い値をそのまま出すと、実データが新しいのに
+    『何年も前のランキング』に見えてしまう（2026-08-27 実際に 2000-01-01 が出た）。
+    """
+    u = (entry or {}).get('updated', '')
+    try:
+        d = datetime.date(*[int(x) for x in u.split('-')])
+    except Exception:
+        return '取得中'
+    today = datetime.date.today()
+    if d > today or (today - d).days > 60:
+        return '取得中'
+    return u
 
 
 def hof_pane(key, label, entry, on):
@@ -695,7 +754,7 @@ def hof_pane(key, label, entry, on):
     if n > 3:
         body += ('<h3 class="rh gold">4位〜' + str(n) + '位</h3><div class="rows">' +
                  ''.join(hrow(v, i) for i, v in enumerate(vids[3:], 4)) + '</div>')
-    body += '<p class="hnote">集計時点: ' + html.escape(entry.get('updated', '')) + '</p>'
+    body += '<p class="hnote">集計時点: ' + html.escape(asof_label(entry)) + '</p>'
     return pane('p-hof-' + key, on, head + body)
 
 
@@ -820,7 +879,7 @@ def main():
     jobs = [('trend', '総合', None, None, '今日いちばん伸びている動画。毎日入れ替わります。')] + \
            list(THEMES) + [(OWN_KEY, OWN_LABEL, None, None, OWN_NOTE)]
     for key, label, q, dur, note in jobs:
-        pool = []
+        pool, how = [], ''
         try:
             if key == 'trend':
                 # 公式の急上昇チャートそのもの＝すでに「その日いちばん伸びているもの」の並び。
@@ -833,6 +892,7 @@ def main():
             else:
                 pool = theme_videos(q, dur)
                 vids = rank_today(pool, hist, hof_ids.get(key, set()))
+                how = '%s／%s' % (_last_window, _last_mode)
         except Exception as e:                      # 1テーマ失敗で全体を落とさない
             print('NG %s: %s' % (label, str(e)[:160]))
             vids = None
@@ -851,7 +911,8 @@ def main():
                 # 同じ日のうちに2回走った時に全タブへ「古いです」と出すのは事実に反する。
                 _asof = keep.get('asof') or prev_updated or data['updated']
                 theme = dict(keep, label=label, note=note, asof=_asof,
-                             stale=older_than_a_day(_asof, data['updated']))
+                             stale=older_than_a_day(_asof, data['updated']),
+                             carried_days=int(keep.get('carried_days', 0)) + 1)
                 data['themes'].append(theme)
                 for v in theme['videos']:
                     newhist[v['videoId']] = v['views']
@@ -877,7 +938,7 @@ def main():
                 v['delta'] = (v['views'] - prev) if isinstance(prev, int) else None
             newhist[v['videoId']] = v['views']
         theme = {'key': key, 'label': label, 'note': note, 'videos': vids,
-                 'asof': data['updated'], 'stale': False}
+                 'asof': data['updated'], 'stale': False, 'how': how, 'carried_days': 0}
         # 固定表示の1本があれば実データを取り直して添える（失敗しても本体は落とさない）
         if key in PINNED:
             try:
@@ -902,9 +963,23 @@ def main():
     if carried:
         # 握り潰さない（最上位ルール(-0.4)）。閾値内でも必ず数を出す。
         print('CARRIED %d/%d テーマが前日分の引き継ぎ: %s' % (len(carried), expected, carried))
+    # 何日連続で引き継いでいるかを必ず出す。日数を出さないと、同じ滞りが何日続いても
+    # 「既知issue」として見えなくなる（CLAUDE.md 最上位ルール(-0.4)）。
+    _stuck = [(t['label'], t.get('carried_days', 0)) for t in data['themes']
+              if t.get('carried_days', 0) >= 1]
+    if _stuck:
+        print('STALL 引き継ぎ日数: %s' % ', '.join('%s=%d日' % x for x in sorted(_stuck, key=lambda y: -y[1])))
+    _worst = max([d for _l, d in _stuck] or [0])
+    if _worst >= 3:
+        print('ESCALATE %d日以上更新できていないジャンルがある。検索語かクォータを見直すこと' % _worst)
     if len(carried) > expected // 2:
         print('WARN 半数以上が引き継ぎ。検索クォータか検索語の問題を疑うこと')
-    if failed or len(data['themes']) < expected - 1:
+    # 🚨 以前は `if failed or ...` だったので、1ジャンルが空になっただけで
+    #    17/18 取れていてもサイトが更新されなかった（緩和条件が死んでいた）。
+    #    穴が1つなら、そのタブを出さずに残りを更新するほうが読者の利益になる。
+    if failed:
+        print('WARN %d ジャンルが空（そのタブは出さない）: %s' % (len(failed), failed))
+    if len(data['themes']) < expected - 1:
         print('FATAL: %d/%d テーマしか取得できず（失敗=%s）。既存サイトを壊さないため何も書かずに中断'
               % (len(data['themes']), expected, failed or 'なし'))
         print('       原因の定番: search.list は "Search Queries per day" という'
@@ -913,7 +988,17 @@ def main():
 
     # 殿堂入りは毎日のタブが全部揃ってから、余った枠で少しずつ取り直す。
     # 補完(fallback)を使った日は検索の日次別枠が危ないのでスキップする＝毎日の更新を最優先。
-    allow = 0 if _fallback_used else HOF_PER_RUN
+    # 🚨 以前は「補完を1回でも使った日は殿堂入りを止める」だったが、_fallback_used は
+    #    全ジャンル共有のカウンタなので、18分の1でも薄いジャンルがあれば毎日全停止し、
+    #    殿堂入りが永久に更新されなくなる（＝APIデータ30日ルールにも抵触する）。
+    #    実際に投げた検索回数で判断し、さらに極端に古いものは枠を無視して必ず1件救う。
+    if _search_calls < SEARCH_SOFT_CAP:
+        allow = HOF_PER_RUN
+    elif any(hof_age(e) >= HOF_FORCE_AGE for e in hofc.values()):
+        allow = 1                                   # 古すぎるものだけは何としても1件更新する
+    else:
+        allow = 0
+    print('殿堂入り判定: search %d回 / 上限%d → 今回%d件' % (_search_calls, SEARCH_SOFT_CAP, allow))
     hofc, hof_done = refresh_hof(hofc, allow)
     save_hof(hofc)
     _ages = sorted(hof_age(e) for e in hofc.values())
