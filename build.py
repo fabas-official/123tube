@@ -416,7 +416,10 @@ def render(d):
         pin = feature(t['pinned']) if t.get('pinned') else ''
         panes.append('<section class="pane' + on + '" id="p-' + t['key'] + '">'
                      '<div class="lead"><h2>' + html.escape(t['label']) + ' ベスト3</h2>'
-                     '<p>' + html.escape(t['note']) + '</p></div>'
+                     '<p>' + html.escape(t['note']) +
+                     ('<br><small>※このタブは ' + html.escape(t.get('asof', '')) +
+                      ' 時点のままです（本日の取得に失敗したため）</small>' if t.get('stale') else '') +
+                     '</p></div>'
                      + pin +
                      '<div class="top3">' + ''.join(card(v) for v in t['videos'][:3]) + '</div>'
                      '<h3 class="rh">' + html.escape(t['label']) + ' ランキング 4位〜' +
@@ -454,12 +457,21 @@ def main():
     if not API_KEY:
         print('FATAL: 環境変数 YT_API_KEY が未設定'); sys.exit(1)
     hist = json.load(open(HIST, encoding='utf-8')) if os.path.exists(HIST) else {}
+    # 前日の結果。取得に失敗したテーマだけ、これを引き継いで穴を空けないために使う。
+    prev_themes, prev_updated = {}, ''
+    if os.path.exists(DATA):
+        try:
+            _pd = json.load(open(DATA, encoding='utf-8'))
+            prev_themes = {t['key']: t for t in _pd.get('themes', [])}
+            prev_updated = _pd.get('updated', '')
+        except Exception as e:
+            print('WARN 前日データを読めない（引き継ぎ無しで続行）: %s' % str(e)[:80])
     data = {'region': REGION, 'site': SITE_URL,
             # GitHub Actions は UTC で動くので、表示は日本時間に直す
             'updated': (datetime.datetime.now(datetime.timezone.utc) +
                         datetime.timedelta(hours=9)).strftime('%Y-%m-%d %H:%M'),
             'themes': []}
-    newhist, failed = {}, []
+    newhist, failed, carried = {}, [], []
     jobs = [('trend', '総合', None, None, '今日いちばん伸びている動画。毎日入れ替わります。')] + \
            list(THEMES) + [(OWN_KEY, OWN_LABEL, None, None, OWN_NOTE)]
     for key, label, q, dur, note in jobs:
@@ -471,15 +483,35 @@ def main():
             else:
                 vids = theme_videos(q, dur)
         except Exception as e:                      # 1テーマ失敗で全体を落とさない
-            print('NG %s: %s' % (label, str(e)[:160])); failed.append(label); continue
+            print('NG %s: %s' % (label, str(e)[:160]))
+            vids = None
         if not vids:
-            print('EMPTY %s' % label); failed.append(label); continue
+            # 🚨 前日分を引き継ぐ（2026-08-26 追加）。
+            #    それまでは1テーマでも欠けると何も書かずに中断していたので、
+            #    検索クォータが尽きた日は **サイトが丸ごと1日更新されなかった**。
+            #    壊れたデータを書かないという原則は守りつつ、
+            #    「昨日のまま」で穴を埋めれば13タブは揃う。古いことは画面とログに明記する。
+            keep = prev_themes.get(key)
+            if keep and keep.get('videos'):
+                print('   └ %s は前日分を引き継ぎ（%d本・%s 時点）'
+                      % (label, len(keep['videos']), keep.get('asof') or prev_updated or '前回'))
+                carried.append(label)
+                theme = dict(keep, label=label, note=note,
+                             asof=keep.get('asof') or prev_updated or data['updated'], stale=True)
+                data['themes'].append(theme)
+                for v in theme['videos']:
+                    newhist[v['videoId']] = v['views']
+                continue
+            print('EMPTY %s（前日分も無いので穴になる）' % label)
+            failed.append(label)
+            continue
         for r, v in enumerate(vids, 1):
             v['rank'] = r
             prev = hist.get(v['videoId'])           # 前回実行時との差＝前日比
             v['delta'] = (v['views'] - prev) if isinstance(prev, int) else None
             newhist[v['videoId']] = v['views']
-        theme = {'key': key, 'label': label, 'note': note, 'videos': vids}
+        theme = {'key': key, 'label': label, 'note': note, 'videos': vids,
+                 'asof': data['updated'], 'stale': False}
         # 固定表示の1本があれば実データを取り直して添える（失敗しても本体は落とさない）
         if key in PINNED:
             try:
@@ -498,6 +530,11 @@ def main():
     #    「3件以上あればOK」という緩いガードを通ってしまい、13タブが5タブに欠けた状態で
     #    index.html を上書きした）。**成功が全体の大半でなければ何も書かずに落とす**のが正解。
     expected = len(jobs)
+    if carried:
+        # 握り潰さない（最上位ルール(-0.4)）。閾値内でも必ず数を出す。
+        print('CARRIED %d/%d テーマが前日分の引き継ぎ: %s' % (len(carried), expected, carried))
+    if len(carried) > expected // 2:
+        print('WARN 半数以上が引き継ぎ。検索クォータか検索語の問題を疑うこと')
     if failed or len(data['themes']) < expected - 1:
         print('FATAL: %d/%d テーマしか取得できず（失敗=%s）。既存サイトを壊さないため何も書かずに中断'
               % (len(data['themes']), expected, failed or 'なし'))
@@ -509,8 +546,9 @@ def main():
     json.dump(newhist, open(HIST, 'w', encoding='utf-8'), ensure_ascii=False)
     size = render(data)
     write_sitemap()
-    print('DONE themes=%d videos=%d bytes=%d failed=%s' % (
-        len(data['themes']), sum(len(t['videos']) for t in data['themes']), size, failed or 'なし'))
+    print('DONE themes=%d videos=%d bytes=%d failed=%s carried=%s' % (
+        len(data['themes']), sum(len(t['videos']) for t in data['themes']), size,
+        failed or 'なし', carried or 'なし'))
 
 
 if __name__ == '__main__':
