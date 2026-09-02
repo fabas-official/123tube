@@ -106,8 +106,8 @@ CATEGORY = {
     'omoshiro': ['23', '1'],       # コメディ＋映画アニメ
     'geinou':   ['24', '23', '1'], # エンタメ＋コメディ＋映画アニメ
     'kawaii':   ['15'],            # ペット＆動物（6本・4位以下は検索で補完）
-    'sugoi':    ['28', '17'],      # 科学技術＋スポーツ（神業・世界記録の受け皿・36本）
 }
+# 'sugoi': ['28','17'] は 2026-09-02 のタブ絞り込みで棚ごと廃止（下の THEMES 参照）
 # ⚠️ 2026-08-27 実測で外したもの:
 #   'anime': '1'  → 日本の映画＆アニメ急上昇はお笑い動画が大半で、棚と合わなかった
 #   'sugoi': '17' → スポーツ急上昇の非Shortsが4本しか無く、ランキング表が埋まらなかった
@@ -119,7 +119,7 @@ CATEGORY = {
 # ただし「本当に昨日一日だけの集計だと何とも言えない」ので、1〜2日で伸び続けているものは可。
 #   → 旬タブ  : 最大14日。急上昇(=数日の勢い)が取れるならそれを最優先
 #   → 通常タブ: 最大30日。日替わりで面白いものが並べばよい
-HOT_KEYS = {'geinou', 'idol', 'news', 'ongaku', 'kane'}
+HOT_KEYS = {'geinou', 'news', 'ongaku', 'kane'}   # idol は 2026-09-02 にエンタメへ統合
 HOT_MAX_AGE = 14
 
 # カテゴリは棚より広い（例: 24=エンタメ には2ch系の語り動画も雑学も入る）。
@@ -144,6 +144,9 @@ HIST = os.path.join(HERE, 'history.json')
 OWNCH = os.path.join(HERE, 'ownch_top.json')
 HOF   = os.path.join(HERE, 'hof.json')
 INDEX = os.path.join(HERE, 'index.html')
+# 量産・AI音声読み上げチャンネルの除外リスト（PMが見つけ次第足す。コードを触らずに済むよう別ファイル）。
+# 🚨 お金タブは除外しない（内田さん 2026-09-02「両学長・投資うさぎ・ゆるチャンネルはみんな見たい系」）。
+BLOCK = os.path.join(HERE, 'blocklist.json')
 
 # 殿堂入り(歴代再生数トップ)の設定。
 # 歴代ランキングは日替わりしないので毎日取り直すのは検索クォータの丸損になる。
@@ -160,74 +163,49 @@ _search_calls = 0       # 実際に投げた search.list の回数（クォー�
 # (キー, 表示名, [検索語...], 長さ絞り込み, 説明文)
 # videoDuration で Shorts を除外している。理由=カードが16:9なので縦動画だと絵が崩れるため。
 THEMES = [
+    # 🚨 2026-09-02 内田さん承認「プロ目線で毎日見たくなるなら絞れ」で 18本 → 10本 に絞り込んだ。
+    #    残す基準: ①日本語の質の高い動画が毎日出る取得元がある ②毎日見る理由がある ③ブランド(心理×お金×音楽)に近い。
+    #    廃止: アイドル(→エンタメへ統合) / びっくり(中国叩きAI語り) / 感動(AI朗読) / 旅行(英語vlog) /
+    #          すごい(科学＋スポーツの寄せ集め) / 怖い(日替わりが薄い) / 痛い(海外の失敗集) / 作業用BGM(毎日見る棚でない)
+    #    弱いタブが並ぶと全体の印象が下がる。強い10本で「毎日見る価値」を作る。
     # ── 1行目: 「今日の話題」系（人・出来事。日替わりがいちばん激しい棚を前に）
-    # キーは geinou のまま（履歴・殿堂入りキャッシュの引き当てを壊さないため）。
-    # 表示名だけ「エンタメ」にした＝中身は YouTube のエンタメ急上昇そのもので、
-    # 芸能・歌手・バラエティ・話題の人まで全部この棚に入る（内田さん指定 2026-08-27）。
     # 🚨 2026-09-02 実測: エンタメ系カテゴリ急上昇(24+23+1)の150本は **横長の動画が0本**（全部縦のショート）。
     #    旧検索語「話題 芸能 エンタメ」も14日で数本しか無く、タブが11本止まり＆31日前の訃報が毎日末尾に残っていた。
-    #    「芸能界」は14日で49本(横長)・3日以内10本。芸能人ランキング・バラエティ・裏話まで広く取れる。
-    ('geinou',   'エンタメ',   ['芸能界'],                                           'medium',
-     '芸能・歌手・バラエティまで、いま話題になっているものをまとめて。'),
-    # 実測 2026-09-02: 上の1語だけだと14日で27本(2,000回超は半分以下)。「アイドル」で47本(全部2,000回超・41ch)。
-    ('idol',     'アイドル',   ['アイドル ライブ パフォーマンス', 'アイドル'], 'medium',
-     'ステージも、その裏側も。推しがいる人のための棚です。'),
+    #    「芸能界」は14日で49本(横長)・3日以内10本。「アイドル」は14日で47本(全部2,000回超・41ch)。
+    ('geinou',   'エンタメ',   ['芸能界', 'アイドル'],                               'medium',
+     '芸能・アイドル・歌手・バラエティまで、いま話題になっているものをまとめて。'),
     ('news',     'ニュース',   ['ニュース 解説 わかりやすい'],                        'medium',
      'いま話題になっていることを、解説つきで。毎日いちばん入れ替わります。'),
-    ('omoshiro', 'おもしろ',   ['爆笑 ドッキリ'],                                     'medium',
-     '爆笑・ドッキリ・珍事件。何も考えずに笑いたい日に。'),
-    ('bikkuri',  'びっくり',   ['衝撃映像'],                                         'medium',
-     '奇跡・衝撃・珍しい瞬間。思わず二度見するやつだけ。'),
-    # 実測 2026-09-02: 「猫 犬 かわいい」は31日で2,000回未満が12本混ざる。「かわいい 動物」で49本(47本が2,000回超)。
-    ('kawaii',   'かわいい',   ['猫 犬 かわいい', 'かわいい 動物'],                   'medium',
-     '犬・猫・赤ちゃん。無心で観たい時のための棚です。'),
-    # 実測 2026-09-02: 「飯テロ グルメ 食べ歩き」は31日で18本止まり。「大食い」で50本(全部2,000回超・29ch・東海オンエア級)。
-    ('meshi',    '飯うま',     ['飯テロ グルメ 食べ歩き', '大食い'],                  'medium',
-     '大食い・爆食・グルメ。お腹が空く覚悟のある人だけどうぞ。'),
-    ('game',     'ゲーム',     ['ゲーム実況 神プレー'],                               'medium',
-     '実況・神プレー・やらかし。自分でやらなくても面白いところだけ。'),
-    # 🚨 アニメは本編の無断アップが多いジャンル。公式PVと考察・解説へ寄せた検索語にして、
-    #    切り抜き本編が上位に来にくいようにしている（2026-08-27 設置時の判断）。
-    # 実測 2026-08-27: 旧「アニメ 公式 PV 最新」は31日で6本しか無かった。
-    # 「アニメ 考察 解説」は50本取れて、しかも本編無断アップではなく考察・解説が並ぶ。
-    ('anime',    'アニメ',     ['アニメ 考察 解説'],                                  'medium',
-     '公式PVと、名シーンの考察・解説。本編の無断転載は載せない方針です。'),
-    # ── 2行目: 「気分で選ぶ」系（感情・用途。最後は流しっぱなしのBGMで締める）
     ('ongaku',   '音楽',       ['MV 新曲 音楽'],                                      'medium',
      'MV・歌ってみた・弾いてみた。耳がよろこぶ棚です。'),
-    # 実測 2026-08-27: 「感動 泣ける 実話」は16本止まり。「感動 泣ける 話」で50本。
-    ('kandou',   '感動',       ['感動 泣ける 話'],                                    'medium',
-     '泣きたい時は、泣いたほうがいい。'),
-    # 実測 2026-09-02: 「人間関係 悩み 対処法」だけだと31日で2,000回超が11本しか無く、タブが11本止まり。
-    # 「恋愛」を足すと31日で49本(全部2,000回超・27チャンネル・ABEMA/Netflix/オリコン等)。2クエリ分の消費は許容。
-    ('renai',    '恋愛・人間関係', ['人間関係 悩み 対処法', '恋愛'],                  'medium',
-     '恋愛と人づきあいの話。うちの本業にいちばん近い棚です。'),
-    ('tabi',     '旅行',       ['旅行 vlog 絶景'],                                   'medium',
-     '絶景・食べ歩き・ひとり旅。行った気になれる棚です。'),
-    ('sugoi',    'すごい',     ['職人技 神業'],                                       'medium',
-     '職人技・神業・世界記録。人間ってすごい。'),
-    ('kowai',    '怖い',       ['心霊 怪談'],                                         'medium',
-     '心霊・怪談・都市伝説。ひとりで観る勇気がある人向け。'),
-    # 🚨 実測 2026-08-27: 旧「失敗 転倒 痛い」は31日で **0件**、「やらかし 失敗集」も2件で、
-    #    このタブが1本しか出ない原因そのものだった。「失敗 ハプニング 爆笑」で13本取れる。
-    # 実測 2026-09-02: 上の1語だけだと31日で20本→表示10本。「ハプニング 集」を足すと+47本(2,000回超25本)。
-    ('itai',     '痛い',       ['失敗 ハプニング 爆笑', 'ハプニング 集'],             'medium',
-     '見てるこっちが痛い、やらかしの記録。'),
-    # 借金は独立させず「お金」に統合。守り(節約・借金)と攻め(投資)の2クエリで
-    # 家計から資産形成までを1つの棚に収める（内田さん指示 2026-08-27）。
-    # 🚨 クエリは1本に絞る（内田さん指示 2026-08-27「いろいろにするとたくさん使ってしまう」）。
-    #    search.list は1回100ユニット固定なので、クエリを増やすと消費が線形に増える。
-    #    語を詰め込むと逆に狭くなるので、広い3語だけを置いて母数を稼ぐ。
-    #    節約・貯金・借金・株・NISA・iDeCo はこの3語のいずれかに引っかかる。
+    ('game',     'ゲーム',     ['ゲーム実況 神プレー'],                               'medium',
+     '実況・神プレー・やらかし。自分でやらなくても面白いところだけ。'),
+    # 🚨 アニメは本編の無断アップが多いジャンル。考察・解説へ寄せた検索語にして、
+    #    切り抜き本編が上位に来にくいようにしている（2026-08-27 実測: 50本取れる）。
+    ('anime',    'アニメ',     ['アニメ 考察 解説'],                                  'medium',
+     '公式PVと、名シーンの考察・解説。本編の無断転載は載せない方針です。'),
+    # ── 2行目: 「気分で選ぶ」系（お金と恋愛はうちの本業にいちばん近い棚）
+    # 🚨 クエリは広い3語を1本（内田さん指示 2026-08-27「いろいろにするとたくさん使ってしまう」）。
     ('kane',     'お金',       ['お金 投資 節約'],                                   'medium',
      '節約・貯金・借金の話から、株・投資・NISA・iDeCoまで。他人事じゃないお金の話。'),
-    ('bgm',      '作業用BGM',  ['作業用BGM 集中'],                                  'long',
-     '手を止めずに流しっぱなしでどうぞ。'),
+    # 実測 2026-09-02: 「人間関係 悩み 対処法」だけだと31日で2,000回超が11本。「恋愛」で49本(ABEMA/Netflix級)。
+    ('renai',    '恋愛・人間関係', ['人間関係 悩み 対処法', '恋愛'],                  'medium',
+     '恋愛と人づきあいの話。うちの本業にいちばん近い棚です。'),
+    # 実測 2026-09-02: 「飯テロ グルメ 食べ歩き」は31日で18本止まり。「大食い」で50本(全部2,000回超・29ch)。
+    ('meshi',    '飯うま',     ['飯テロ グルメ 食べ歩き', '大食い'],                  'medium',
+     '大食い・爆食・グルメ。お腹が空く覚悟のある人だけどうぞ。'),
+    # 実測 2026-09-02: 「猫 犬 かわいい」は2,000回未満が12本混ざる。「かわいい 動物」で49本(47本が2,000回超)。
+    ('kawaii',   'かわいい',   ['猫 犬 かわいい', 'かわいい 動物'],                   'medium',
+     '犬・猫・赤ちゃん。無心で観たい時のための棚です。'),
+    # 実測 2026-09-02: 「爆笑 ドッキリ」は31日で日本語の横長が5本しか無かった（海外の funny moments が大半）。
+    #    「ドッキリ」1語で46本(全部2,000回超・34ch・東海オンエア/QuizKnock級)。カタカナ語なので外国語が混ざらない。
+    ('omoshiro', 'おもしろ',   ['ドッキリ'],                                          'medium',
+     '爆笑・ドッキリ・珍事件。何も考えずに笑いたい日に。'),
 ]
 
 # タブのボタンでだけ使う短い呼び名。7個×2段に収めるための措置で、
 # 見出し・説明文では正式名称（THEMES の表示名）をそのまま使う。
-SHORT_LABEL = {'bgm': 'BGM', 'renai': '恋愛'}
+SHORT_LABEL = {'renai': '恋愛'}
 
 OWN_KEY, OWN_LABEL = 'ucchii', 'うっちーPの歌'
 OWN_NOTE = 'このサイトを作っている人が書いた歌です。作詞はぜんぶ本人。'
@@ -335,6 +313,27 @@ def landscape(it):
     return w > h
 
 
+_block = None           # blocklist.json の中身（正規化済み・起動時に1回だけ読む）
+
+
+def norm_ch(s):
+    """チャンネル名の照合用。記号・空白・絵文字を落として小文字に（「🇯🇵 JP Pulse」→「jppulse」）。"""
+    return ''.join(ch for ch in (s or '').lower() if ch.isalnum())
+
+
+def blocked_channel(name):
+    """blocklist.json の channels に載っているチャンネルなら True（2026-09-02 内田さん承認）。
+
+    対象は「AI音声でニュース風に読み上げるだけの量産チャンネル」。実際に再生されている有名どころは載せない。
+    照合は**完全一致**（正規化後）。部分一致にすると「日本ニュース」で日テレNEWSまで消える。
+    """
+    global _block
+    if _block is None:
+        b = read_json(BLOCK, {})
+        _block = set(norm_ch(x) for x in (b.get('channels') or []) if x)
+    return norm_ch(name) in _block
+
+
 def hydrate(ids, drop_vertical=True):
     """IDリスト -> 実統計付きデータ。videos.list は50件までなので分割して呼ぶ。
 
@@ -364,6 +363,9 @@ def hydrate(ids, drop_vertical=True):
                 dropped.append('vertical')     # 縦動画はカードに合わないので載せない
                 continue
             sn = it['snippet']
+            if blocked_channel(sn.get('channelTitle', '')):
+                dropped.append('blocklist')    # 量産・AI読み上げチャンネルは載せない
+                continue
             th = sn.get('thumbnails', {})
             out.append({
                 'videoId': it['id'], 'title': sn.get('title', ''),
@@ -574,6 +576,14 @@ def theme_videos(queries, dur, window=None, key=None):
     # ここでは cap_channel を掛けない。プールを先に3本/chへ絞ると、
     # rank_today() が「その日の伸び」で選ぶ前に再生数順で切られてしまうため。
     vids = dedupe_titles(sorted(hydrate(ids), key=lambda x: -x['views']))
+    # 🇯🇵 検索で取る棚は「タイトルにかなが1文字も無い動画」を載せない（2026-09-02）。
+    #    relevanceLanguage=ja でも英語のK-POP解説・韓国語の大食い・中国語の動画が混ざる。
+    #    日本語の棚に外国語のタイトルが並ぶと「雑なまとめ」に見える。カテゴリ急上昇(総合・音楽・ゲーム等)は
+    #    日本で実際に伸びているものなので、そちらには掛けない（Stray Kids 等の英語MVは正しく載る）。
+    _jp = [v for v in vids if re.search(r'[ぁ-んァ-ヶー]', v.get('title', ''))]
+    if len(vids) - len(_jp):
+        print('   └ かなの無いタイトル%d本を外す（外国語の動画）' % (len(vids) - len(_jp)))
+    vids = _jp
     fresh = len([v for v in vids if age_days(v) <= TODAY_MAX_AGE])
     print('   └ 直近%d日で%d本（うち%d日以内=%d本）' % (days, len(vids), TODAY_MAX_AGE, fresh))
     return vids                                # 振り分けは rank_today() と topup() が行う
@@ -982,7 +992,8 @@ def card(v):
             '" target="_blank" rel="noopener">'
             '<div class="tw"><img loading="lazy" src="' + html.escape(v['thumb']) + '" alt="">'
             '<span class="rk">' + str(v['rank']) + '</span>'
-            '<span class="dur">' + html.escape(v['duration']) + '</span></div>'
+            '<span class="dur">' + html.escape(v['duration']) + '</span>'
+            + ('<span class="newb">NEW</span>' if v.get('new') else '') + '</div>'
             '<div class="mt"><p class="ch">' + html.escape(v['channelTitle']) + '</p>'
             '<h3>' + html.escape(v['title']) + '</h3>'
             '<p class="vw">' + big(v['views']) + '</p>'
@@ -1010,7 +1021,8 @@ def row(v):
     delta = delta_html(v)
     return ('<a class="row" href="https://www.youtube.com/watch?v=' + html.escape(v['videoId']) +
             '" target="_blank" rel="noopener">'
-            '<span class="n">' + str(v['rank']) + '</span>'
+            '<span class="n">' + str(v['rank']) +
+            ('<i class="newr">NEW</i>' if v.get('new') else '') + '</span>'
             '<span class="rtw"><img loading="lazy" src="' + html.escape(v['thumb']) + '" alt="">'
             '<i>' + html.escape(v['duration']) + '</i></span>'
             '<span class="ri"><b>' + html.escape(v['title']) + '</b>'
@@ -1071,9 +1083,16 @@ def today_pane(t, on):
     if len(vids) > 3:
         rest = ('<h3 class="rh">今日の 4位〜' + str(len(vids)) + '位</h3>'
                 '<div class="rows">' + ''.join(row(v) for v in vids[3:]) + '</div>')
+    nc = t.get('new_count')
+    if nc is None:
+        newline = ''
+    elif nc:
+        newline = '<p class="newline">🆕 今日の新顔 <b>' + str(nc) + '本</b>／' + str(len(vids)) + '本</p>'
+    else:
+        newline = '<p class="newline"><span class="flat">きょうは昨日と同じ顔ぶれです</span></p>'
     head = ('<div class="lead"><span class="lbadge">今日</span>'
             '<h2>' + html.escape(t['label']) + ' ベスト3</h2>'
-            '<p>' + html.escape(t['note']) + how + stale + '</p></div>')
+            '<p>' + html.escape(t['note']) + how + stale + '</p>' + newline + '</div>')
     return pane('p-today-' + t['key'], on,
                 head + pin + '<div class="top3">' + ''.join(card(v) for v in vids[:3]) + '</div>' + rest)
 
@@ -1196,7 +1215,18 @@ def render(d, hofc):
     # フッターの説明文は定数から埋める。文言と実装が食い違うと「表示の嘘」になる
     # （2026-09-02 まで「直近90日」「1日2ジャンル」と、とっくに変わった数字が残っていた）。
     hof_cycle = -(-len(THEMES) // max(1, HOF_PER_RUN))
-    out = (tpl.replace('__BODY__', body).replace('__UPD__', d['updated'])
+    # ヘッダーの「きょうの新顔」合計。新顔を数えられた棚が1つも無い日（初日・同日の作り直し）は出さない
+    _known = [t for t in d['themes'] if t.get('new_count') is not None]
+    # 更新時刻は「9/3 03:20」の形で頭に出す。毎日来る人が最初に確かめるのは「今日のか？」だから。
+    try:
+        _u = datetime.datetime.strptime(d['updated'][:16], '%Y-%m-%d %H:%M')
+        _ut = '%d/%d %s' % (_u.month, _u.day, _u.strftime('%H:%M'))
+    except Exception:
+        _ut = d.get('updated', '')
+    newtotal = (('<p class="sub3">🆕 きょうの新顔: 全ジャンルで <b>' +
+                 str(sum(t['new_count'] for t in _known)) + '本</b>　<span class="upd">更新 ' + _ut + '</span></p>')
+                if _known else '<p class="sub3"><span class="upd">更新 ' + _ut + '</span></p>')
+    out = (tpl.replace('__BODY__', body).replace('__UPD__', d['updated']).replace('__NEWTOTAL__', newtotal)
               .replace('__T_HOT__', str(HOT_TIERS[0])).replace('__C_HOT__', str(HOT_TIERS[-1]))
               .replace('__T_NORM__', str(NORMAL_TIERS[0])).replace('__C_NORM__', str(NORMAL_TIERS[-1]))
               .replace('__STREAK__', str(TOP3_MAX_STREAK)).replace('__HOF_PER_RUN__', str(HOF_PER_RUN))
@@ -1345,7 +1375,8 @@ def main():
                 vids = demote_used(vids, keep_head=3)    # ベスト3は確定済み。4位以下だけ既出を後ろへ
                 for v in vids:
                     _used_ids.add(v['videoId'])
-                how = '%s／%s／ベスト3は公開%d日以内' % (_last_window, _last_mode, _last_top_age)
+                # 読者向けの説明なので、記号の羅列でなく「何を・どう並べたか」が読める形にする
+                how = '選び方: %s ／ 並び: %s ／ ベスト3は公開%d日以内から' % (_last_window, _last_mode, _last_top_age)
         except Exception as e:                      # 1テーマ失敗で全体を落とさない
             print('NG %s: %s' % (label, str(e)[:160]))
             vids = None
@@ -1403,6 +1434,20 @@ def main():
             newhist[v['videoId']] = v['views']
         theme = {'key': key, 'label': label, 'note': note, 'videos': vids,
                  'asof': data['updated'], 'stale': False, 'how': how, 'carried_days': 0}
+        # 🆕 今日の新顔（2026-09-02 内田さん承認）。昨日の棚に無かった動画に印を付け、本数を数える。
+        #    比較相手は「最後に別の日に作った棚」。同じ日に2回走った時は前回が残した yesterday_ids を使う
+        #    （それが無い＝今日最初の作り直しなら印を付けない。1時間前との差を「新顔」と呼ぶのは嘘になる）。
+        if key != OWN_KEY:
+            _pt = prev_themes.get(key) or {}
+            if same_day:
+                base = set(_pt['yesterday_ids']) if _pt.get('yesterday_ids') is not None else None
+            else:
+                base = set(v['videoId'] for v in (_pt.get('videos') or [])) or None
+            for v in vids:
+                v['new'] = bool(base) and v['videoId'] not in base
+            if base is not None:
+                theme['yesterday_ids'] = sorted(base)
+                theme['new_count'] = sum(1 for v in vids if v.get('new'))
         # 固定表示の1本があれば実データを取り直して添える（失敗しても本体は落とさない）
         if key in PINNED:
             try:

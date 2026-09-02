@@ -2,7 +2,7 @@
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>YouTube動画まとめランキング｜今日のベスト3と殿堂入り - 123Tube</title>
-<meta name="description" content="飯うま・かわいい・びっくり・おもしろ・痛い・借金・スカッと・感動・怖い・すごい。ジャンルごとに「今日いちばん伸びているベスト3」と「歴代の殿堂入り」を毎日まとめています。探す手間なしで観たいものがすぐ見つかる動画まとめランキングです。">
+<meta name="description" content="エンタメ・ニュース・音楽・ゲーム・アニメ・お金・恋愛・飯うま・かわいい・おもしろ。ジャンルごとに「今日いちばん伸びているベスト3」と「歴代の殿堂入り」を毎日まとめています。昨日なかった動画にはNEWの印。探す手間なしで観たいものがすぐ見つかる動画まとめランキングです。">
 <link rel="canonical" href="https://fabas-official.github.io/123tube/">
 <meta property="og:title" content="YouTube動画まとめランキング｜今日のベスト3と殿堂入り - 123Tube">
 <meta property="og:description" content="ジャンルごとの「今日いちばん伸びているベスト3」と「歴代の殿堂入り」を毎日まとめています。">
@@ -60,6 +60,19 @@ header{padding:34px 20px 20px;text-align:center}
 .sub2{margin:0 auto;max-width:760px;color:var(--sub);font-size:clamp(14.5px,2.8vw,17px)}
 .sub2 .kr{color:var(--ac);font-weight:900}
 .sub2 .kg{color:var(--gold);font-weight:900}
+/* ── 🆕 今日の新顔（2026-09-02）。毎日来る人が「今日はここが変わった」を一目で分かるように ── */
+.sub3{margin:10px auto 0;font-size:14.5px;color:var(--sub);font-weight:500}
+.sub3 b{color:var(--ac);font-weight:900;font-size:16px}
+.sub3 .upd{color:var(--sub);font-size:13px}
+.newline{margin:10px 0 0;font-size:14.5px;font-weight:700;color:var(--tx)}
+.newline b{color:var(--ac)}
+.newline .flat{color:var(--sub);font-weight:500}
+.newb{position:absolute;top:8px;right:8px;background:var(--ac-fill);color:var(--on-ac);font-size:11px;
+      font-weight:900;letter-spacing:.1em;padding:2px 9px;border-radius:999px;line-height:1.5;
+      box-shadow:0 1px 4px rgba(0,0,0,.4)}
+.newr{display:block;font-style:normal;font-size:9.5px;font-weight:900;color:var(--on-ac);
+      background:var(--ac-fill);border-radius:999px;padding:0 4px;margin:3px auto 0;line-height:1.6;
+      letter-spacing:.06em;max-width:40px}
 
 /* ── ナビ: [総合] │ 2段のジャンル │ [うっちーPの歌] ───────────────
    左右の大ボタンは同じ幅にして中央を挟む＝左右のバランスが崩れないようにする。 */
@@ -119,13 +132,16 @@ header{padding:34px 20px 20px;text-align:center}
 /* 🚨 横スクロールにしない。棒を動かさないと見えないジャンルは「無い」のと同じ。
    列数(--cols)はジャンル数の半分をビルド側が入れるので、広い画面では必ず2段になる。
    狭い画面だけ列数を落とす。 */
+/* 10ジャンル＝どの画面幅でも「5列×2段」に固定する（2026-09-02）。
+   3列や4列にすると 3+3+3+1 / 4+4+2 の半端な段ができて、最後の1個が浮いて見える。
+   狭い画面では文字を少し小さくして5列を守る（375pxで1ボタン約59px・4文字が収まる）。 */
 .tabs{display:grid;gap:6px;min-width:0;padding:2px;
-      grid-template-columns:repeat(3,minmax(0,1fr))}
-@media(min-width:470px){.tabs{grid-template-columns:repeat(4,minmax(0,1fr))}}
-@media(min-width:700px){.tabs{grid-template-columns:repeat(var(--cols,6),minmax(0,1fr))}}
-.tab{padding:12px 4px;border:1.5px solid var(--line);border-radius:999px;cursor:pointer;text-align:center;
-     background:var(--bg);color:var(--tx);font-size:14px;font-weight:700;white-space:nowrap;
-     overflow:hidden;font-family:inherit;transition:.14s}
+      grid-template-columns:repeat(var(--cols,5),minmax(0,1fr))}
+.tab{padding:12px 2px;border:1.5px solid var(--line);border-radius:999px;cursor:pointer;text-align:center;
+     background:var(--bg);color:var(--tx);font-size:12.5px;font-weight:700;white-space:nowrap;
+     overflow:hidden;font-family:inherit;transition:.14s;letter-spacing:-.01em}
+@media(min-width:470px){.tab{font-size:13.5px;padding:12px 4px;letter-spacing:0}}
+@media(min-width:700px){.tab{font-size:14px}}
 .today .tab:hover{border-color:var(--ac);color:var(--ac);background:var(--ac-s)}
 .today .tab.on{background:var(--ac-fill);border-color:var(--ac-fill);color:var(--on-ac)}
 .hof .tab:hover{border-color:var(--gold);color:var(--gold);background:var(--gold-s)}
@@ -248,14 +264,16 @@ footer a{color:var(--ac);font-weight:700}
   <p class="logo">123<span>Tube</span></p>
   <h1 class="tag">YouTube動画まとめランキング｜今日のベスト3と、殿堂入り</h1>
   <p class="sub2">探すのが面倒な日に。<b class="kr">赤＝今日いちばん伸びてるやつ</b> ／ <b class="kg">金＝歴代の殿堂入り</b>です。</p>
+  __NEWTOTAL__
 </header>
 <main>__BODY__</main>
 <footer>
   <p>最終更新: __UPD__ ／ 対象地域: 日本 ／ 毎日自動更新<br>
   再生回数・コメント数は YouTube Data API v3 から取得した、取得時点の公式数値です。<br>
-  <b>今日のベスト3（赤）</b>＝その日いちばん伸びている動画です。エンタメ・アイドル・ニュース・音楽・お金は公開__T_HOT__日以内を優先し、足りない日だけ__C_HOT__日まで広げます。ほかのジャンルは公開__T_NORM__日以内を優先し、足りない日だけ__C_NORM__日まで。同じ動画がベスト3に居られるのは__STREAK__日連続までで、次の日からは4位以下に下げます。4位以下は、旬のジャンルが直近__HOT_FILL__日・ほかは直近__FILL__日の動画から埋めます。<b>その日に実際に使った条件は各タブに表示します。</b>総合は当日の急上昇そのものです。<br>
+  <b>今日のベスト3（赤）</b>＝その日いちばん伸びている動画です。エンタメ・ニュース・音楽・お金は公開__T_HOT__日以内を優先し、足りない日だけ__C_HOT__日まで広げます。ほかのジャンルは公開__T_NORM__日以内を優先し、足りない日だけ__C_NORM__日まで。同じ動画がベスト3に居られるのは__STREAK__日連続までで、次の日からは4位以下に下げます。4位以下は、旬のジャンルが直近__HOT_FILL__日・ほかは直近__FILL__日の動画から埋めます。<b>その日に実際に使った条件は各タブに表示します。</b>総合は当日の急上昇そのものです。<br>
   <b>殿堂入り（金）</b>＝公開日を問わない歴代の再生回数順です。1日__HOF_PER_RUN__ジャンルずつ順番に取り直しています（約__HOF_CYCLE__日で一周）。<br>
-  縦型のショート動画は載せていません（横長のカードに合わないため）。<br>
+  縦型のショート動画は載せていません（横長のカードに合わないため）。<b>NEW</b>＝昨日の棚に無かった動画です。<br>
+  AI音声で読み上げるだけの量産チャンネルは、見つけ次第ランキングから外しています。<br>
   今日の棚には殿堂入りの動画を出さないようにしているので、同じ動画が上下に並ぶことはありません。<br>
   同じチャンネルばかりが並ばないよう、1つの棚に同じチャンネルは3本までにしています。大きく出るベスト3の枠は、必ず違うチャンネルから選んでいます。<br>
   日本で再生できない動画（削除・非公開・地域制限・年齢制限）は載せていません。<br>
