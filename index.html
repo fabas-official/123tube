@@ -21,6 +21,15 @@
  "inLanguage":"ja"}
 </script>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🥇</text></svg>">
+<!-- Google アナリティクス（2026-09-02 内田さん承認）。見るのは「何人来たか」と「どのタブが押されたか」だけ。
+     GA4 プロパティ 123Tube (552454659) / ストリーム 15621282941。個人を特定する情報は送らない。 -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-X1WH13NLNW"></script>
+<script>
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-X1WH13NLNW');
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
@@ -271,14 +280,15 @@ footer a{color:var(--ac);font-weight:700}
   <p>最終更新: 2026-09-02 22:15 ／ 対象地域: 日本 ／ 毎日自動更新<br>
   再生回数・コメント数は YouTube Data API v3 から取得した、取得時点の公式数値です。<br>
   <b>今日のベスト3（赤）</b>＝その日いちばん伸びている動画です。エンタメ・ニュース・音楽・お金は公開3日以内を優先し、足りない日だけ14日まで広げます。ほかのジャンルは公開7日以内を優先し、足りない日だけ30日まで。同じ動画がベスト3に居られるのは2日連続までで、次の日からは4位以下に下げます。4位以下は、旬のジャンルが直近14日・ほかは直近31日の動画から埋めます。<b>その日に実際に使った条件は各タブに表示します。</b>総合は当日の急上昇そのものです。<br>
-  <b>殿堂入り（金）</b>＝公開日を問わない歴代の再生回数順です。1日0ジャンルずつ順番に取り直しています（約10日で一周）。<br>
+  <b>殿堂入り（金）</b>＝公開日を問わない歴代の再生回数順です。1日3ジャンルずつ順番に取り直しています（約4日で一周）。<br>
   縦型のショート動画は載せていません（横長のカードに合わないため）。<b>NEW</b>＝昨日の棚に無かった動画です。<br>
   AI音声で読み上げるだけの量産チャンネルは、見つけ次第ランキングから外しています。<br>
   今日の棚には殿堂入りの動画を出さないようにしているので、同じ動画が上下に並ぶことはありません。<br>
   同じチャンネルばかりが並ばないよう、1つの棚に同じチャンネルは3本までにしています。大きく出るベスト3の枠は、必ず違うチャンネルから選んでいます。<br>
   日本で再生できない動画（削除・非公開・地域制限・年齢制限）は載せていません。<br>
   動画の再生は YouTube 上で行われます。当サイトは動画を保存・再配信していません。</p>
-  <p>当サイトは動画情報の取得に YouTube API サービスを利用しています。取得した情報は表示のために保持するだけで、閲覧者の個人情報は収集していません。<br>
+  <p>当サイトは動画情報の取得に YouTube API サービスを利用しています。取得した情報は表示のために保持するだけです。<br>
+  アクセス数の把握のために Google アナリティクスを使っています（Cookie を使って匿名の利用状況を Google に送信します。氏名やメールアドレスなど個人を特定する情報は含みません）。<br>
   <a href="https://www.youtube.com/t/terms" target="_blank" rel="noopener">YouTube 利用規約</a>
    ／ <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google プライバシーポリシー</a></p>
   <p><a href="https://www.youtube.com/channel/UCGkI3Cpu_a6yvizyqQLbKKA" target="_blank" rel="noopener">うっちーPとエンタメの世界</a>
@@ -295,6 +305,8 @@ document.querySelectorAll('.tab').forEach(function (b) {
     document.querySelectorAll('.pane').forEach(function (x) { x.classList.remove('on'); });
     b.classList.add('on');
     p.classList.add('on');
+    // どのタブが押されたかを記録する（棚の増減はこの数字で決める・2026-09-02）
+    if (window.gtag) { gtag('event', 'select_tab', { shelf: b.dataset.g, genre: b.dataset.t }); }
     // 押した結果として出てきた中身の先頭へ寄せる。
     // ナビの頭へ戻していたが、それだと選んだ中身がそのまま画面の外に出てしまう。
     p.scrollIntoView({ block: 'start', behavior: 'smooth' });
