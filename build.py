@@ -29,6 +29,14 @@ import json, os, re, sys, html, datetime, urllib.parse, urllib.request
 HERE = os.path.dirname(os.path.abspath(__file__))
 API_KEY = os.environ.get('YT_API_KEY', '').strip()
 REGION, LIST_N = 'JP', 20
+# ── エディション切替（2026-09-03 追加） ─────────────────────────────
+# 英語版「Japan Buzz」を同じビルダーで作るための唯一の分岐点。
+# 既定値はここに書いた通り＝日本版そのもの。configure_edition('en') を呼んだ時だけ
+# 下の値を英語版用に上書きする（呼ばなければ日本版の挙動は1ミリも変わらない）。
+EDITION = 'jp'
+LANG = 'ja'                                   # search.list の relevanceLanguage
+TEMPLATE_FILE = os.path.join(HERE, 'template.html')
+SITEMAP = os.path.join(HERE, 'sitemap.xml')
 # ジャンルタブが「歴代ランキング」になって中身が入れ替わらない問題への対処。
 # この日数以内に公開された動画の中での再生数順にする（2026-08-26 追加）。
 # 広げるほど殿堂入り寄り・狭めるほど日替わり寄りになる。ここ1箇所で調整できる。
@@ -222,6 +230,102 @@ PINNED = {
 }
 # 「歌」判定に使う語。うっちーPの楽曲は「作詞：うっちー」表記が定型なのでこれを主軸にする。
 SONG_HINT = ('作詞', 'Fabas', 'ファバス', 'オリジナル曲', 'MV', 'ミュージックビデオ', 'のうた', 'の歌')
+
+
+# ==================================================================
+# 🇺🇸 英語版「Japan Buzz」（2026-09-03 内田さん決裁 §8・memory
+#     project_123tube_youtube_matome_site_2026-08-26.md「🇺🇸 英語版」節が正典）
+# 日本版の下は一切変更しない。ここから下は EN 専用の定数・関数だけを追加する。
+# ==================================================================
+
+# 検索語は実測してから決定（2026-09-03・scratchpad measure_en.py / measure_en2.py・
+# regionCode=US, relevanceLanguage=en, videoDuration=medium, 31日窓, search.list 11回消費）。
+#   anime review     : 50本中 views>=2000 50本／ベトナム語reaction+雑多チャンネルが多く弱い
+#   anime explained  : 50本中 インド系Hindi/Urdu解説chが上位(Anime oi 11/50等)＝要blocklist・不採用
+#   anime edit       : 横長50本・CJK0本だが「編集チュートリアル」「無関係な曲のedit」が3〜4割混入→不採用
+#   anime music video: 同系統だがMarilyn Manson等の完全無関係MVまで混入→不採用
+#   anime amv edit   : 50本中 CJK後49本。Bleach/Demon Slayer/Black Clover/One Piece/Naruto等の
+#                       実在アニメAMVが大半（r/anime・TikTok編集文化と直結）。混入は数チャンネルのみ→採用
+#                       （混入した数チャンネルは en/blocklist.json へ・2026-09-03実測 scratchpad測定済）
+#   japan travel vlog: 50本中 横長50本・実在の日本旅行vlogチャンネル中心→採用
+#   tokyo food        : 話題が拡散しすぎ(韓国食べ歩き等混入)のため不採用
+#   japan street food : 「Mumbai STREET Food Challenge」等 日本と無関係な動画が上位→不採用
+#   japan food tour   : views>=2000 31本・実在の日本フードvlogチャンネル中心→採用
+#   japanese cat      : views>=2000 31本・実在の猫チャンネル中心→採用
+# CATEGORY(mostPopularカテゴリ急上昇)はEN版では使わない＝9/2実測で対象カテゴリの横長動画が0本だったため
+# （memory 該当節「エンタメ24・コメディ23・映画1・ペット15・スポーツ17・科学28・HowTo26 は0本」）。
+# 4タブとも search ベース(theme_videos)・NORMAL_TIERS(7/14/30日)・FILL_DAYS(31日)・
+# FILL_MIN_VIEWS(2000)・pool.json(12h再利用)・縦動画除外・streak連続居座り防止は日本版と完全に同じ仕組みを流用する。
+THEMES_EN = [
+    ('anime', 'Anime', ['anime amv edit'], 'medium',
+     "Fan edits and AMVs buzzing right now — the clip culture that made anime travel "
+     "outside Japan in the first place. No full-episode reposts."),
+    ('travel', 'Travel', ['japan travel vlog'], 'medium',
+     'Real trips, real reactions — what it actually looks like to travel Japan right now.'),
+    ('food', 'Food', ['japan food tour'], 'medium',
+     'Ramen, street food, and everything worth queueing for.'),
+    ('cute', 'Cute', ['japanese cat'], 'medium',
+     'Cats (and the occasional very good dog). No commentary needed.'),
+]
+# 除外リストはJP版と同じ完全一致方式で en/blocklist.json を別に育てる（2026-09-03 種を投入）。
+# 「Trending in Japan」枠は trending(region='JP') を直接使うので theme_videos を通らず、
+# filter_lang() の対象にもならない（翻訳しない方針＝日本語タイトルのまま出す）。
+#
+# 🚨 2026-09-03 実測で判明: order=viewCount の緩い一致で「Travel」「Food」に日本と無関係な動画
+# （ロシア・カザン/台湾/韓国/カタールの旅行食べ歩き等）が混ざった。JP版のかなフィルタと同じ発想で、
+# タイトル or チャンネル名に japan/tokyo/kyoto/osaka のいずれかを含む動画だけに絞る（main_en()側で適用）。
+# 「Anime」も同様に、編集チュートリアルや無関係な楽曲マッシュアップが「AMV」タグ経由で混ざるため、
+# タイトルに anime/amv のいずれかを含むものだけに絞る（Bleach/Demon Slayer等の作品名だけのAMVタイトルは
+# 通常「AMV」を明記するので実害は小さい。取りこぼしは許容し、消すのではなく1件ずつ blocklist で対処する）。
+TOPIC_KEYWORDS_EN = {'anime':  ('anime', 'amv'),
+                     'travel': ('japan', 'tokyo', 'kyoto', 'osaka'),
+                     'food':   ('japan', 'tokyo', 'kyoto', 'osaka')}
+PINNED_EN = {
+    'ucchii': {
+        'videoId': 'cWzRARpo7nQ',
+        'lead': 'Start here',
+        'note': 'The Fabas origin story and our best tracks, in one 6-and-a-half-minute video. '
+                'The fastest way in — even if you don’t read Japanese.',
+    },
+}
+OWN_LABEL_EN = "Ucchii-P's Songs"
+OWN_NOTE_EN = 'Songs written and produced by the person who built this site. Every lyric is self-written.'
+
+
+def configure_edition(edition):
+    """'en' を渡した時だけ、下のグローバルをまとめて英語版「Japan Buzz」用に書き換える。
+    'jp'（既定・呼ばない場合も同じ）なら何もしない＝日本版の挙動は1ミリも変わらない。
+    これが日本版とEN版を分ける**唯一**の分岐点（2026-09-03）。
+    """
+    global EDITION, REGION, LANG, DATA, HIST, HOF, INDEX, POOL, BLOCK, SITE_URL
+    global THEMES, CATEGORY, HOT_KEYS, PINNED, OWN_LABEL, OWN_NOTE, SHORT_LABEL
+    global TEMPLATE_FILE, SITEMAP
+    if edition != 'en':
+        EDITION = 'jp'
+        return
+    EDITION = 'en'
+    REGION = 'US'                              # 対象は英語圏全体。取得は region=US を継続（§8②）
+    LANG = 'en'
+    out_dir = os.path.join(HERE, 'en')
+    os.makedirs(out_dir, exist_ok=True)
+    DATA = os.path.join(out_dir, 'data.json')
+    HIST = os.path.join(out_dir, 'history.json')
+    # OWNCH（うっちーPチャンネルの走査キャッシュ）は書き換えない＝JP版と共有。
+    # 同じチャンネル・同じ曲で言語非依存のため、250uの再走査を二重に払わない。
+    HOF = os.path.join(out_dir, 'hof.json')     # 未使用（EN版に殿堂入りタブは無い。§3設計）
+    INDEX = os.path.join(out_dir, 'index.html')
+    POOL = os.path.join(out_dir, 'pool.json')
+    BLOCK = os.path.join(out_dir, 'blocklist.json')
+    SITEMAP = os.path.join(out_dir, 'sitemap.xml')
+    SITE_URL = 'https://fabas-official.github.io/123tube/en/'
+    TEMPLATE_FILE = os.path.join(HERE, 'template_en.html')
+    THEMES = THEMES_EN
+    CATEGORY = {}                               # EN版はカテゴリ急上昇を使わない（実測で横長0本のため）
+    HOT_KEYS = set()                            # EN版に旬タブの区別は無い（全タブ NORMAL_TIERS）
+    PINNED = PINNED_EN
+    OWN_LABEL = OWN_LABEL_EN
+    OWN_NOTE = OWN_NOTE_EN
+    SHORT_LABEL = {}
 
 
 # ---------------------------------------------------------------- API
@@ -432,7 +536,7 @@ def search_ids(q, dur, days=None):
     maxResults を増やしても消費は変わらない**ので、候補は取れるだけ取る。
     """
     p = {'part': 'id', 'type': 'video', 'order': 'viewCount', 'q': q,
-         'regionCode': REGION, 'relevanceLanguage': 'ja',
+         'regionCode': REGION, 'relevanceLanguage': LANG,
          'videoDuration': dur, 'safeSearch': 'moderate', 'maxResults': 50}
     if days:
         after = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=days)
@@ -545,6 +649,29 @@ def older_than_a_day(asof, now):
         return True
 
 
+def filter_lang(vids):
+    """検索候補から「そのエディションの対象言語に合わないタイトル」を落とす。
+
+    🇯🇵 JP版（既定）: タイトルにかなが1文字も無い動画を外国語として除外（2026-09-02）。
+       relevanceLanguage=ja でも英語のK-POP解説・韓国語の大食い・中国語の動画が混ざる。
+       カテゴリ急上昇(総合・音楽・ゲーム等)には掛けない（Stray Kids 等の英語MVは正しく載せたいため。
+       category_videos() はこの関数を呼ばない＝影響なし）。
+    🇺🇸 EN版: 逆に、タイトルにCJK文字（かな・漢字・ハングル）を含む動画を除外する
+       （2026-09-03 内田さん決裁「Trending in Japan」枠以外の英語タブに日本語/韓国語タイトルを出さない）。
+       「Trending in Japan」枠は trending() を直接使い、この関数を通らないので対象外。
+    """
+    if EDITION == 'en':
+        cjk_ids = set(v['videoId'] for v in vids
+                      if re.search(r'[぀-ヿ㐀-鿿가-힣]', v.get('title', '')))
+        if cjk_ids:
+            print('   └ drop %d CJK-titled videos (off-brand for an English tab)' % len(cjk_ids))
+        return [v for v in vids if v['videoId'] not in cjk_ids]
+    _jp = [v for v in vids if re.search(r'[ぁ-んァ-ヶー]', v.get('title', ''))]
+    if len(vids) - len(_jp):
+        print('   └ かなの無いタイトル%d本を外す（外国語の動画）' % (len(vids) - len(_jp)))
+    return _jp
+
+
 def theme_videos(queries, dur, window=None, key=None):
     """検索でそのジャンルの候補を集める。**窓は1つ、検索は1クエリ1回だけ**。
 
@@ -576,14 +703,7 @@ def theme_videos(queries, dur, window=None, key=None):
     # ここでは cap_channel を掛けない。プールを先に3本/chへ絞ると、
     # rank_today() が「その日の伸び」で選ぶ前に再生数順で切られてしまうため。
     vids = dedupe_titles(sorted(hydrate(ids), key=lambda x: -x['views']))
-    # 🇯🇵 検索で取る棚は「タイトルにかなが1文字も無い動画」を載せない（2026-09-02）。
-    #    relevanceLanguage=ja でも英語のK-POP解説・韓国語の大食い・中国語の動画が混ざる。
-    #    日本語の棚に外国語のタイトルが並ぶと「雑なまとめ」に見える。カテゴリ急上昇(総合・音楽・ゲーム等)は
-    #    日本で実際に伸びているものなので、そちらには掛けない（Stray Kids 等の英語MVは正しく載る）。
-    _jp = [v for v in vids if re.search(r'[ぁ-んァ-ヶー]', v.get('title', ''))]
-    if len(vids) - len(_jp):
-        print('   └ かなの無いタイトル%d本を外す（外国語の動画）' % (len(vids) - len(_jp)))
-    vids = _jp
+    vids = filter_lang(vids)
     fresh = len([v for v in vids if age_days(v) <= TODAY_MAX_AGE])
     print('   └ 直近%d日で%d本（うち%d日以内=%d本）' % (days, len(vids), TODAY_MAX_AGE, fresh))
     return vids                                # 振り分けは rank_today() と topup() が行う
@@ -818,14 +938,18 @@ def dedupe_titles(vids):
     return out
 
 
-def trending():
+def trending(region=None):
     """総合タブ=今日の急上昇。mostPopular は1ユニットで済む公式エンドポイント。
 
     maxResults を 50（APIの上限）にしているのは、unplayable() の除外が効いたときに
     20位まで埋まらなくなるのを防ぐため。取得件数を増やしてもクォータは1ユニットのまま。
+
+    region を渡すと、そのエディションの既定REGIONとは別の地域を1回だけ取れる。
+    英語版の「Trending in Japan」タブが REGION=US のビルド中に REGION=JP を取るのに使う
+    （2026-09-03 追加。global REGION を書き換えないので副作用が無い）。
     """
     v = api('videos', {'part': 'id', 'chart': 'mostPopular',
-                       'regionCode': REGION, 'maxResults': 50})
+                       'regionCode': region or REGION, 'maxResults': 50})
     return hydrate([i['id'] for i in v.get('items', [])])   # 20本への絞り込みは main() 側
 
 
@@ -1253,10 +1377,152 @@ def write_sitemap():
            '    <priority>1.0</priority>\n'
            '  </url>\n'
            '</urlset>\n')
-    _sm = os.path.join(HERE, 'sitemap.xml')
+    _sm = SITEMAP
     with open(_sm + '.tmp', 'w', encoding='utf-8') as f:
         f.write(xml)
     os.replace(_sm + '.tmp', _sm)
+
+
+# ---------------------------------------------------------------- 描画(EN)
+# JP版の render()/card()/row() 等は一切変更しない。英語版はここから下の別関数だけを使う。
+
+def big_en(n):
+    """1234567 -> '1.2M views'。英語読者向けの桁感。"""
+    if n >= 1000000:
+        return str(round(n / 1000000.0, 1)) + 'M views'
+    if n >= 1000:
+        return str(round(n / 1000.0, 1)) + 'K views'
+    return format(n, ',') + ' views'
+
+
+def commentary_en(v):
+    """再生数と経過日数から事実ベースの一言を生成する（JP版 commentary() の英語版）。"""
+    try:
+        y, m, dd = [int(x) for x in v['publishedAt'].split('-')]
+        days = max(1, (datetime.date.today() - datetime.date(y, m, dd)).days)
+    except Exception:
+        days = 1
+    span = ('%.1f years' % (days / 365.0)) if days >= 365 else ('%d day%s' % (days, '' if days == 1 else 's'))
+    s = 'Published %s ago — now at %s (about %s/day).' % (
+        span, big_en(v['views']), format(int(v['views'] / days), ','))
+    d = v.get('delta')
+    if isinstance(d, int) and d > 0:
+        s += ' +%s since yesterday.' % format(d, ',')
+    elif isinstance(d, int) and d < 0:
+        s += ' %s since yesterday.' % format(d, ',')
+    return s
+
+
+def card_en(v):
+    medal = ['gold', 'silver', 'bronze'][v['rank'] - 1]
+    return ('<a class="card ' + medal + '" href="https://www.youtube.com/watch?v=' + html.escape(v['videoId']) +
+            '" target="_blank" rel="noopener">'
+            '<div class="tw"><img loading="lazy" src="' + html.escape(v['thumb']) + '" alt="">'
+            '<span class="rk">' + str(v['rank']) + '</span>'
+            '<span class="dur">' + html.escape(v['duration']) + '</span>'
+            + ('<span class="newb">NEW</span>' if v.get('new') else '') + '</div>'
+            '<div class="mt"><p class="ch">' + html.escape(v['channelTitle']) + '</p>'
+            '<h3>' + html.escape(v['title']) + '</h3>'
+            '<p class="vw">' + big_en(v['views']) + '</p>'
+            '<p class="cm">' + html.escape(commentary_en(v)) + '</p>'
+            '<span class="btn">Watch on YouTube →</span></div></a>')
+
+
+def row_en(v):
+    delta = delta_html(v)   # 記号ベース(+/-/—)なので言語非依存・JP版の関数をそのまま使う
+    return ('<a class="row" href="https://www.youtube.com/watch?v=' + html.escape(v['videoId']) +
+            '" target="_blank" rel="noopener">'
+            '<span class="n">' + str(v['rank']) +
+            ('<i class="newr">NEW</i>' if v.get('new') else '') + '</span>'
+            '<span class="rtw"><img loading="lazy" src="' + html.escape(v['thumb']) + '" alt="">'
+            '<i>' + html.escape(v['duration']) + '</i></span>'
+            '<span class="ri"><b>' + html.escape(v['title']) + '</b>'
+            '<em>' + html.escape(v['channelTitle']) + '</em></span>'
+            '<span class="rs"><u>' + format(v['views'], ',') + ' views</u>'
+            '<i>vs yesterday ' + delta + '</i><i>' + format(v['comments'], ',') + ' comments</i></span></a>')
+
+
+def feature_en(p):
+    return ('<a class="feat" href="https://www.youtube.com/watch?v=' + html.escape(p['videoId']) +
+            '" target="_blank" rel="noopener">'
+            '<span class="ftw"><img loading="lazy" src="' + html.escape(p['thumb']) + '" alt="">'
+            '<i>' + html.escape(p['duration']) + '</i></span>'
+            '<span class="fmt"><em>' + html.escape(p['lead']) + '</em>'
+            '<b>' + html.escape(p['title']) + '</b>'
+            '<span class="fnote">' + html.escape(p['note']) + '</span>'
+            '<span class="fviews">▶ ' + big_en(p['views']) + '</span></span></a>')
+
+
+def theme_pane_en(t, on):
+    vids = t['videos']
+    stale = ('<br><small>※ Still showing the ' + html.escape(t.get('asof', '')) +
+             ' JST snapshot (today’s fetch failed).</small>') if t.get('stale') else ''
+    pin = feature_en(t['pinned']) if t.get('pinned') else ''
+    how = ('<br><small>' + html.escape(t['how']) + '</small>') if t.get('how') else ''
+    rest = ''
+    if len(vids) > 3:
+        rest = ('<h3 class="rh">#4 – #' + str(len(vids)) + '</h3>'
+                '<div class="rows">' + ''.join(row_en(v) for v in vids[3:]) + '</div>')
+    nc = t.get('new_count')
+    if nc is None:
+        newline = ''
+    elif nc:
+        newline = '<p class="newline">\U0001f195 New today: <b>' + str(nc) + '</b> of ' + str(len(vids)) + '</p>'
+    else:
+        newline = '<p class="newline"><span class="flat">Same lineup as yesterday.</span></p>'
+    head = ('<div class="lead"><span class="lbadge">TODAY</span>'
+            '<h2>' + html.escape(t['label']) + ' — Top 3</h2>'
+            '<p>' + html.escape(t['note']) + how + stale + '</p>' + newline + '</div>')
+    return pane('p-' + t['key'], on,
+                head + pin + '<div class="top3">' + ''.join(card_en(v) for v in vids[:3]) + '</div>' + rest)
+
+
+def render_en(d):
+    """Japan Buzz（英語版）のページを組む。JP版の render() とは別関数（内田さん決定に合わせ、
+    殿堂入りなし・単一階層・6タブの3列×2段グリッド）。
+
+        [ Anime ][ Travel ][ Food ]
+        [ Cute ][ Trending in Japan ][ Ucchii-P's Songs ]
+
+    Anime は主役なので先頭・既定で開く（§8③）。Ucchii-P's Songs は常に最後尾＝
+    見つけやすい固定位置に置き、own アクセント色で目立たせる（隅に追いやらない）。
+    """
+    themes = {t['key']: t for t in d['themes']}
+    nav_order = [(k, l) for k, l, _q, _dur, _n in THEMES] + \
+                [('jptrend', 'Trending in Japan'), (OWN_KEY, OWN_LABEL)]
+    genres = [(k, l) for k, l in nav_order if k in themes]
+    default_key = genres[0][0] if genres else ''
+
+    def btn(k, l):
+        cls = 'tab'
+        if k == default_key:
+            cls += ' on'
+        if k == OWN_KEY:
+            cls += ' ownacc'
+        return '<button class="' + cls + '" data-t="' + k + '">' + html.escape(l) + '</button>'
+
+    nav = '<div class="tabs">' + ''.join(btn(k, l) for k, l in genres) + '</div>'
+    panes = [theme_pane_en(themes[k], k == default_key) for k, _l in genres]
+    body = nav + '<div class="panes">' + ''.join(panes) + '</div>'
+    tpl = open(TEMPLATE_FILE, encoding='utf-8').read()
+    _known = [t for t in d['themes'] if t.get('new_count') is not None]
+    try:
+        _u = datetime.datetime.strptime(d['updated'][:16], '%Y-%m-%d %H:%M')
+        _ut = '%d/%d %s JST' % (_u.month, _u.day, _u.strftime('%H:%M'))
+    except Exception:
+        _ut = d.get('updated', '')
+    newtotal = (('<p class="sub3">\U0001f195 New across every genre today: <b>' +
+                 str(sum(t['new_count'] for t in _known)) + '</b>　<span class="upd">Updated ' + _ut + '</span></p>')
+                if _known else '<p class="sub3"><span class="upd">Updated ' + _ut + '</span></p>')
+    out = (tpl.replace('__BODY__', body).replace('__UPD__', d['updated']).replace('__NEWTOTAL__', newtotal)
+              .replace('__T_NORM__', str(NORMAL_TIERS[0])).replace('__C_NORM__', str(NORMAL_TIERS[-1]))
+              .replace('__STREAK__', str(TOP3_MAX_STREAK)).replace('__FILL__', str(FILL_DAYS)))
+    with open(INDEX + '.tmp', 'w', encoding='utf-8') as f:
+        f.write(out)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(INDEX + '.tmp', INDEX)
+    return len(out.encode('utf-8'))
 
 
 # ---------------------------------------------------------------- main
@@ -1524,6 +1790,194 @@ def main():
         failed or 'なし', carried or 'なし'))
 
 
+def _mode_en(japanese_mode):
+    """rank_today() が _last_mode に残す日本語の説明文を、EN版の「how」表示用に英訳する。
+    rank_today() 自体は改変しない（JP版が使う日本語文言のまま）。2026-09-03
+    実測で「how」欄に日本語がそのまま漏れていたので追加（UI文言は全部英語ルール）。"""
+    m = japanese_mode or ''
+    if m.startswith('前日からの伸び順'):
+        return '1-day growth'
+    if m.startswith('再生回数順'):
+        return 'total views (not enough growth history yet)'
+    if m.startswith('急上昇順'):
+        return "YouTube's own trending order"
+    return 'views'
+
+
+def main_en():
+    """Japan Buzz（英語版）のビルド。configure_edition('en') 済みが前提。
+
+    JP版 main() と同じ低レベル部品（theme_videos/rank_today/topup/hydrate/trending/own_songs/
+    cap_channel/dedupe_titles/demote_used/streak連続居座り防止/pool.json再利用/縦動画除外/
+    部分失敗ガード）をそのまま再利用しつつ、ジョブ構成だけ6タブ・殿堂入り無しに変える。
+    JP版 main() 自体は一切変更しない（このファイル内の別関数）。
+    """
+    if not API_KEY:
+        print('FATAL: 環境変数 YT_API_KEY が未設定'); sys.exit(1)
+    hist = read_json(HIST, {})
+    _pd = read_json(DATA, {})
+    prev_themes = dict((t['key'], t) for t in _pd.get('themes', []) if t.get('key'))
+    prev_updated = _pd.get('updated', '')
+    now_jst = _now_jst().strftime('%Y-%m-%d %H:%M')
+    # JP版と同じ「同日再実行ガード」。daily.yml は同じジョブの中でJP版の直後にこれを実行するので、
+    # 直前ビルド=JP版の時刻との差になる。EN版はJP版よりわずかに遅れて走るだけなので実害はない。
+    if prev_updated and not os.environ.get('FORCE'):
+        try:
+            _gap = (datetime.datetime.strptime(now_jst, '%Y-%m-%d %H:%M') -
+                    datetime.datetime.strptime(prev_updated[:16], '%Y-%m-%d %H:%M')).total_seconds() / 3600.0
+        except Exception:
+            _gap = 10 ** 6
+        if 0 <= _gap < MIN_INTERVAL_H:
+            print('SKIP(en) 直前のビルド(%s)から%.1fh。%dh未満なので今回は何もしない'
+                  % (prev_updated, _gap, MIN_INTERVAL_H))
+            return
+    data = {'region': REGION, 'site': SITE_URL, 'updated': now_jst, 'themes': []}
+    newhist, failed, carried, pending = {}, [], [], []
+    prev_streak = {}
+    for _k, _t in prev_themes.items():
+        for _v in (_t.get('videos') or [])[:3]:
+            prev_streak[(_k, _v['videoId'])] = int(_v.get('streak') or 1)
+    same_day = bool(prev_updated) and prev_updated[:10] == now_jst[:10]
+    streak_step = 0 if same_day else 1
+
+    # 'jptrend' = 「Trending in Japan」。JP版の総合と同じ情報源(mostPopular region=JP)を
+    # region引数だけ変えて直接取る＝検索を使わず1u。翻訳しない方針なのでタイトルはそのまま。
+    jobs = [('jptrend', 'Trending in Japan', None, None,
+             "Japan's own overall trending chart, straight from YouTube. Titles stay in Japanese on "
+             "purpose — the thumbnail tells the story even if you can't read the words.")] + \
+           list(THEMES) + [(OWN_KEY, OWN_LABEL, None, None, OWN_NOTE)]
+
+    for key, label, q, dur, note in jobs:
+        pool, how = [], ''
+        try:
+            if key == 'jptrend':
+                pool = trending(region='JP')
+                vids = pool[:LIST_N]
+            elif key == OWN_KEY:
+                pool = own_songs()          # チャンネルは共通。ownch_top.jsonキャッシュもJP版と共有
+                vids = pool
+            else:
+                # EN版は全タブ NORMAL_TIERS(7/14/30日)・FILL_DAYS(31日)固定。旬/通常の区別は無い。
+                block = set(vid for (k2, vid), s in prev_streak.items()
+                            if k2 == key and s >= TOP3_MAX_STREAK) | set(_used_ids)
+                pool = theme_videos(q, dur, window=FILL_DAYS, key=key)
+                _kw = TOPIC_KEYWORDS_EN.get(key)
+                if _kw:
+                    _before = len(pool)
+                    pool = [v for v in pool if any(
+                        w in (v['title'] + ' ' + v['channelTitle']).lower() for w in _kw)]
+                    if _before - len(pool):
+                        print('   └ drop %d off-topic (no Japan keyword): %d -> %d'
+                              % (_before - len(pool), _before, len(pool)))
+                vids = rank_today(pool, hist, set(), tiers=NORMAL_TIERS, block=block)
+                if pool:
+                    vids = topup(vids, pool, set(), max_age=FILL_DAYS)
+                _ok = [v for v in vids if v.get('views', 0) >= FILL_MIN_VIEWS]
+                if len(_ok) >= 10 and len(_ok) < len(vids):
+                    print('   └ drop %d videos under %d views (%d -> %d)'
+                          % (len(vids) - len(_ok), FILL_MIN_VIEWS, len(vids), len(_ok)))
+                    vids = _ok
+                vids = demote_used(vids, keep_head=3)
+                for v in vids:
+                    _used_ids.add(v['videoId'])
+                how = ('source: search, last %d days / order: %s / top3 within %d days'
+                       % (FILL_DAYS, _mode_en(_last_mode), _last_top_age))
+        except Exception as e:                      # 1テーマ失敗で全体を落とさない（JP版と同じ思想）
+            print('NG %s: %s' % (label, str(e)[:160]))
+            vids = None
+        if vids and key not in ('jptrend', OWN_KEY):
+            for v in vids:
+                v.pop('streak', None)
+            for v in vids[:3]:
+                _p = prev_streak.get((key, v['videoId']))
+                v['streak'] = (_p + streak_step) if _p else 1
+        if not vids:
+            keep = prev_themes.get(key)
+            if keep and keep.get('videos'):
+                print('   └ %s carried from the previous build (%d videos, %s)'
+                      % (label, len(keep['videos']), keep.get('asof') or prev_updated or 'previous'))
+                carried.append(label)
+                _asof = keep.get('asof') or prev_updated or data['updated']
+                theme = dict(keep, label=label, note=note, asof=_asof,
+                             stale=older_than_a_day(_asof, data['updated']),
+                             carried_days=int(keep.get('carried_days', 0)) + 1)
+                data['themes'].append(theme)
+                for v in theme['videos']:
+                    newhist[v['videoId']] = v['views']
+                continue
+            if key not in prev_themes:
+                print('SKIP %s（new genre・not fetched yet・will retry next run）' % label)
+                pending.append(label)
+            else:
+                print('EMPTY %s（no carry-over available either）' % label)
+                failed.append(label)
+            continue
+        for v in pool:
+            newhist[v['videoId']] = v['views']
+        for r, v in enumerate(vids, 1):
+            v['rank'] = r
+            if v.get('delta') is None:
+                prev = hist.get(v['videoId'])
+                v['delta'] = (v['views'] - prev) if isinstance(prev, int) else None
+            newhist[v['videoId']] = v['views']
+        theme = {'key': key, 'label': label, 'note': note, 'videos': vids,
+                 'asof': data['updated'], 'stale': False, 'how': how, 'carried_days': 0}
+        if key != OWN_KEY:
+            _pt = prev_themes.get(key) or {}
+            if same_day:
+                base = set(_pt['yesterday_ids']) if _pt.get('yesterday_ids') is not None else None
+            else:
+                base = set(v['videoId'] for v in (_pt.get('videos') or [])) or None
+            for v in vids:
+                v['new'] = bool(base) and v['videoId'] not in base
+            if base is not None:
+                theme['yesterday_ids'] = sorted(base)
+                theme['new_count'] = sum(1 for v in vids if v.get('new'))
+        if key in PINNED:
+            try:
+                got = hydrate([PINNED[key]['videoId']], drop_vertical=False)
+                if got:
+                    theme['pinned'] = dict(got[0], lead=PINNED[key]['lead'], note=PINNED[key]['note'])
+                    print('   └ pinned: %s' % got[0]['title'][:40])
+                else:
+                    print('   └ NG pinned: video unavailable')
+            except Exception as e:
+                print('   └ NG pinned: %s' % str(e)[:80])
+        data['themes'].append(theme)
+        print('OK %s (%d)' % (label, len(vids)))
+
+    expected = len(jobs) - len(pending)
+    if pending:
+        print('PENDING(en) %d genres new/not fetched yet: %s' % (len(pending), pending))
+    if carried:
+        print('CARRIED(en) %d/%d themes carried from previous build: %s' % (len(carried), expected, carried))
+    _stuck = [(t['label'], t.get('carried_days', 0)) for t in data['themes'] if t.get('carried_days', 0) >= 1]
+    if _stuck:
+        print('STALL(en) carry-over days: %s' % ', '.join('%s=%dd' % x for x in sorted(_stuck, key=lambda y: -y[1])))
+    if failed:
+        print('WARN(en) %d genres empty (tab withheld): %s' % (len(failed), failed))
+    if len(data['themes']) < expected - 1:
+        print('FATAL(en): only %d/%d themes fetched (failed=%s). Not writing so the live site stays intact.'
+              % (len(data['themes']), expected, failed or 'none'))
+        sys.exit(1)
+
+    write_json(DATA, data)
+    write_json(HIST, newhist)
+    pool_save()
+    size = render_en(data)
+    write_sitemap()
+    print('DONE(en) themes=%d videos=%d bytes=%d failed=%s carried=%s' % (
+        len(data['themes']), sum(len(t['videos']) for t in data['themes']), size,
+        failed or 'none', carried or 'none'))
+
+
+def render_only_en():
+    """EN版の --render-only（API消費ゼロ）。JP版 render_only() と同じ考え方の別関数。"""
+    data = read_json(DATA, {'updated': '', 'themes': []})
+    size = render_en(data)
+    print('RENDER-ONLY(en) bytes=%d themes=%d' % (size, len(data.get('themes', []))))
+
+
 def render_only():
     """APIを1回も叩かずに index.html だけ作り直す（見た目の調整用・消費0ユニット）。
 
@@ -1590,12 +2044,29 @@ def hof_only():
     print('HOF-ONLY 更新=%s / 保有=%d/12ジャンル' % (done or 'なし', len(hofc)))
 
 
+def _parse_edition():
+    """--edition en / --edition=en を拾う。無指定は 'jp'（＝今までと同じ挙動）。"""
+    argv = sys.argv[1:]
+    for i, a in enumerate(argv):
+        if a == '--edition' and i + 1 < len(argv):
+            return argv[i + 1]
+        if a.startswith('--edition='):
+            return a.split('=', 1)[1]
+    return 'jp'
+
+
 if __name__ == '__main__':
+    # configure_edition('jp') は何もしない no-op なので、--edition を渡さない今まで通りの
+    # 呼び方（daily.yml の `python build.py` 等）は挙動が1ミリも変わらない。
+    configure_edition(_parse_edition())
     if '--render-only' in sys.argv:
-        render_only()
+        render_only_en() if EDITION == 'en' else render_only()
     elif '--hof-only' in sys.argv:
-        hof_only()
+        if EDITION == 'en':
+            print('EN版に殿堂入りタブは無いので --hof-only は何もしない')
+        else:
+            hof_only()
     elif '--fill-missing' in sys.argv:
         fill_missing()
     else:
-        main()
+        main_en() if EDITION == 'en' else main()

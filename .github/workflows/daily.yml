@@ -28,18 +28,33 @@ jobs:
           python-version: '3.12'
 
       # build.py は Python 標準ライブラリだけで動くので pip install は不要
-      - name: Build site
+      - name: Build site (JP)
         env:
           YT_API_KEY: ${{ secrets.YT_API_KEY }}
           FORCE: ${{ github.event_name == 'workflow_dispatch' && '1' || '' }}
         run: python build.py
 
-      # 差分が無い日は commit しない（空コミットでヒストリを汚さない）
+      # 🇺🇸 英語版「Japan Buzz」（2026-09-03 追加）。同じジョブの中でJP版の直後に続けて走らせる
+      # （ワークフローもキーもJP版と共有。同一GCPプロジェクトの同じ日次枠を消費するだけで新規契約は無い）。
+      # if: always() で JP版が exit(1) した日でも EN版は独立して試す（帰ってきた全員返す・一日でも
+      # 滞ったら止めない、の考え方をエディション間にも適用）。片方でも失敗すればジョブは赤いままなので
+      # 気づけなくなることはない（`|| true` は付けない）。
+      - name: Build site (EN - Japan Buzz)
+        if: always()
+        env:
+          YT_API_KEY: ${{ secrets.YT_API_KEY }}
+          FORCE: ${{ github.event_name == 'workflow_dispatch' && '1' || '' }}
+        run: python build.py --edition en
+
+      # 差分が無い日は commit しない（空コミットでヒストリを汚さない）。JP/EN 両方のファイルをまとめて1コミット。
+      # if: always() で片方のビルドが失敗しても、もう片方が更新できていればそのファイルだけでも反映する。
       - name: Commit updated site
+        if: always()
         run: |
           git config user.name  "123tube-bot"
           git config user.email "actions@github.com"
-          git add index.html data.json history.json ownch_top.json hof.json sitemap.xml pool.json
+          git add index.html data.json history.json ownch_top.json hof.json sitemap.xml pool.json \
+                  en/index.html en/data.json en/history.json en/pool.json en/sitemap.xml
           if git diff --staged --quiet; then
             echo "変更なし。コミットをスキップ"
           else

@@ -1,0 +1,21 @@
+{
+ "note": "Japan Buzz (EN) channel blocklist. Exact match after normalization (norm_ch), same scheme as the JP site's blocklist.json. Seeded 2026-09-03 from measure_en*.py real-query results (scratchpad) and from the first production build of en/data.json. Two groups: (A) channels observed polluting the ADOPTED query 'anime amv edit' (off-topic Tamil/political edits, AI-generated content, editing-app tutorials mislabeled as anime, unrelated movie AMVs) — these DID make it into the live candidate pool and needed removal. (B) channels observed dominating the REJECTED query 'anime explained' (Hindi/Urdu narration mass-production) — not adopted for the live theme, kept here defensively in case a future query change surfaces them again, per memory project_123tube_youtube_matome_site_2026-08-26.md.",
+ "channels": [
+  "MADARA",
+  "ANIMES AI",
+  "Cosmos Funtainment International YT",
+  "Wizzy Tutorials",
+  "PsychoLover Subs",
+  "T A Y Y A B神",
+  "Kaydeevfx",
+  "Tyson Tutorials",
+  "| 𝙸 - 𝙰𝙼 - 𝙹𝙷𝙾𝙽𝙽𝚈 |",
+  "Anime oi",
+  "Mr Hindi Explainer",
+  "Ali Explains Max",
+  "Anokhi Films",
+  "Filmaze Explain",
+  "AKFC ANIME",
+  "Rainimator"
+ ]
+}
