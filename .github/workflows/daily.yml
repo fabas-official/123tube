@@ -1,10 +1,16 @@
 name: daily-build
 
-# 毎朝 21:10 UTC = 日本時間 06:10 に実行。内田さんのPCが落ちていても GitHub 側で走る。
-# workflow_dispatch を付けてあるので、手動実行ボタンからいつでも即時更新できる。
+# 内田さんのPCが落ちていても GitHub 側で走る。
+# 🚨 GitHub の schedule は数時間遅れる（実測: 06:10 JST 指定で 08:13〜14:18 JST に発火・2026-08-28〜09-02）。
+#    朝に見る人へ「今日」を出すため、本命 03:17 JST に加えて予備を 05:43 / 07:29 JST に置く。
+#    直前のビルドから3時間以内なら build.py が何もせず終わる（API消費ゼロ・commitも無し）ので、
+#    3本とも発火しても二重更新にはならない。分は :00 を避けている（毎時0分は混雑で遅れやすい）。
+# workflow_dispatch を付けてあるので、手動実行ボタンからいつでも即時更新できる（FORCE=1 で間隔ガードを無視）。
 on:
   schedule:
-    - cron: '10 21 * * *'
+    - cron: '17 18 * * *'
+    - cron: '43 20 * * *'
+    - cron: '29 22 * * *'
   workflow_dispatch:
 
 # index.html / data.json を書き戻すため書き込み権限が要る
@@ -25,6 +31,7 @@ jobs:
       - name: Build site
         env:
           YT_API_KEY: ${{ secrets.YT_API_KEY }}
+          FORCE: ${{ github.event_name == 'workflow_dispatch' && '1' || '' }}
         run: python build.py
 
       # 差分が無い日は commit しない（空コミットでヒストリを汚さない）
@@ -32,7 +39,7 @@ jobs:
         run: |
           git config user.name  "123tube-bot"
           git config user.email "actions@github.com"
-          git add index.html data.json history.json ownch_top.json hof.json sitemap.xml
+          git add index.html data.json history.json ownch_top.json hof.json sitemap.xml pool.json
           if git diff --staged --quiet; then
             echo "変更なし。コミットをスキップ"
           else

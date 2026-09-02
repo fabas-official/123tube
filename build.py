@@ -40,6 +40,16 @@ REGION, LIST_N = 'JP', 20
 #      30日より前は下の段(殿堂入り)の担当。上の段には二度と載せない。
 FRESH_DAYS = 7
 TODAY_MAX_AGE = 30      # 最終防波堤。何があっても**上の段(ベスト3)**にこれより古い動画は出さない
+# 🚨 2026-09-02 内田さん指摘「今日のベスト3に3〜6日前が入っている。毎日見る人には困る」。
+#    実測(8/28〜9/2の6ビルド): ベスト3に **6日連続で居座った動画が13本**、通常タブのベスト3は
+#    公開16〜26日前が普通だった。上限(14/30日)の内側なら何日前でも同列に扱っていたのが原因。
+#    → ベスト3は「いちばん新しい層」から順に埋める。旬タブは 3日→7日→14日、通常タブは 7日→14日→30日。
+#      新しい層に3本(別チャンネル)あれば古い層は見ない。
+HOT_TIERS = (3, 7, 14)
+NORMAL_TIERS = (7, 14, 30)
+# 同じ動画がベスト3に居られる連続日数。内田さん「1〜2日で伸び続けているものは可」(2026-08-27)に合わせて2日。
+# 3日目からは4位以下へ下げる（消さない）。data.json の各動画に streak を持たせて数える。
+TOP3_MAX_STREAK = 2
 
 # ── 4位以下（ランキング表）を埋める枠 ───────────────────────────────
 # 内田さん指定 2026-08-27:「足らない分はお勧めみたいなやつで1ヶ月ぐらいで流行ってる動画を
@@ -55,7 +65,22 @@ TODAY_MAX_AGE = 30      # 最終防波堤。何があっても**上の段(ベス
 #    → 全テーマを **1クエリ** に統一して、1回のビルドの検索を約24回→約12回へ半減させた。
 #      2クエリで母数を稼ぐより、**実測で本数が出る1語を選ぶ**ほうが効く（痛い・アニメ・感動で実証）。
 FILL_DAYS = 31
+# 旬タブ(エンタメ・アイドル・ニュース・音楽・お金)の4位以下は14日まで。
+# 2026-09-02: エンタメの末尾に 8/2 公開の訃報動画が31日間毎日出続けていた（内田さん指摘「今日の11番がいつも同じ」）。
+# 旬タブでは2週間前の話題はもう「今日の棚」に置く情報ではない。検索の窓もこの日数にする＝検索回数は増えない。
+HOT_FILL_DAYS = 14
 FILL_MIN_VIEWS = 2000   # これ未満は「おすすめ」として並べるには弱いので入れない
+# ── 検索プールの再利用（2026-09-02 新設） ─────────────────────────────
+# search.list の別枠日次上限（実測およそ50回/日・16:00 JST境界）を守るため、
+# 直近 POOL_TTL_H 時間以内に同じ条件で取った動画IDの一覧は pool.json から再利用する。
+# 再生数・前日比は毎回 videos.list(1u) で取り直すので鮮度は落ちない。
+# ＝ 夜に手作業でビルドしても翌朝の自動ビルドが検索枠を食い潰さない。
+POOL_TTL_H = 12
+# 同じ日に何度も走っても API を食わないための最小間隔。GitHub の cron は数時間遅れることがあるので
+# daily.yml に予備の時刻を複数置いてあり、直前のビルドがこの時間以内なら後続は何もしない。
+# 手動実行(workflow_dispatch)は環境変数 FORCE=1 で必ず走る。
+MIN_INTERVAL_H = 3
+POOL = os.path.join(HERE, 'pool.json')
 _last_window = ''       # 直近の theme_videos が実際に使った期間（タブの説明に出す）
 _last_mode = ''         # 直近の rank_today が実際に使った並べ方（同上）       # 90日で足りないジャンルを救う2段目。歴代へ飛ぶ前にここを挟む
 FALLBACK_MAX = 3        # 期間指定なしでの補完を許す最大テーマ数（検索の日次別枠を守るため）
@@ -138,9 +163,13 @@ THEMES = [
     # キーは geinou のまま（履歴・殿堂入りキャッシュの引き当てを壊さないため）。
     # 表示名だけ「エンタメ」にした＝中身は YouTube のエンタメ急上昇そのもので、
     # 芸能・歌手・バラエティ・話題の人まで全部この棚に入る（内田さん指定 2026-08-27）。
-    ('geinou',   'エンタメ',   ['話題 芸能 エンタメ'],                                'medium',
+    # 🚨 2026-09-02 実測: エンタメ系カテゴリ急上昇(24+23+1)の150本は **横長の動画が0本**（全部縦のショート）。
+    #    旧検索語「話題 芸能 エンタメ」も14日で数本しか無く、タブが11本止まり＆31日前の訃報が毎日末尾に残っていた。
+    #    「芸能界」は14日で49本(横長)・3日以内10本。芸能人ランキング・バラエティ・裏話まで広く取れる。
+    ('geinou',   'エンタメ',   ['芸能界'],                                           'medium',
      '芸能・歌手・バラエティまで、いま話題になっているものをまとめて。'),
-    ('idol',     'アイドル',   ['アイドル ライブ パフォーマンス'], 'medium',
+    # 実測 2026-09-02: 上の1語だけだと14日で27本(2,000回超は半分以下)。「アイドル」で47本(全部2,000回超・41ch)。
+    ('idol',     'アイドル',   ['アイドル ライブ パフォーマンス', 'アイドル'], 'medium',
      'ステージも、その裏側も。推しがいる人のための棚です。'),
     ('news',     'ニュース',   ['ニュース 解説 わかりやすい'],                        'medium',
      'いま話題になっていることを、解説つきで。毎日いちばん入れ替わります。'),
@@ -148,9 +177,11 @@ THEMES = [
      '爆笑・ドッキリ・珍事件。何も考えずに笑いたい日に。'),
     ('bikkuri',  'びっくり',   ['衝撃映像'],                                         'medium',
      '奇跡・衝撃・珍しい瞬間。思わず二度見するやつだけ。'),
-    ('kawaii',   'かわいい',   ['猫 犬 かわいい'],                                    'medium',
+    # 実測 2026-09-02: 「猫 犬 かわいい」は31日で2,000回未満が12本混ざる。「かわいい 動物」で49本(47本が2,000回超)。
+    ('kawaii',   'かわいい',   ['猫 犬 かわいい', 'かわいい 動物'],                   'medium',
      '犬・猫・赤ちゃん。無心で観たい時のための棚です。'),
-    ('meshi',    '飯うま',     ['飯テロ グルメ 食べ歩き'],                            'medium',
+    # 実測 2026-09-02: 「飯テロ グルメ 食べ歩き」は31日で18本止まり。「大食い」で50本(全部2,000回超・29ch・東海オンエア級)。
+    ('meshi',    '飯うま',     ['飯テロ グルメ 食べ歩き', '大食い'],                  'medium',
      '大食い・爆食・グルメ。お腹が空く覚悟のある人だけどうぞ。'),
     ('game',     'ゲーム',     ['ゲーム実況 神プレー'],                               'medium',
      '実況・神プレー・やらかし。自分でやらなくても面白いところだけ。'),
@@ -166,7 +197,9 @@ THEMES = [
     # 実測 2026-08-27: 「感動 泣ける 実話」は16本止まり。「感動 泣ける 話」で50本。
     ('kandou',   '感動',       ['感動 泣ける 話'],                                    'medium',
      '泣きたい時は、泣いたほうがいい。'),
-    ('renai',    '恋愛・人間関係', ['人間関係 悩み 対処法'],                          'medium',
+    # 実測 2026-09-02: 「人間関係 悩み 対処法」だけだと31日で2,000回超が11本しか無く、タブが11本止まり。
+    # 「恋愛」を足すと31日で49本(全部2,000回超・27チャンネル・ABEMA/Netflix/オリコン等)。2クエリ分の消費は許容。
+    ('renai',    '恋愛・人間関係', ['人間関係 悩み 対処法', '恋愛'],                  'medium',
      '恋愛と人づきあいの話。うちの本業にいちばん近い棚です。'),
     ('tabi',     '旅行',       ['旅行 vlog 絶景'],                                   'medium',
      '絶景・食べ歩き・ひとり旅。行った気になれる棚です。'),
@@ -176,7 +209,8 @@ THEMES = [
      '心霊・怪談・都市伝説。ひとりで観る勇気がある人向け。'),
     # 🚨 実測 2026-08-27: 旧「失敗 転倒 痛い」は31日で **0件**、「やらかし 失敗集」も2件で、
     #    このタブが1本しか出ない原因そのものだった。「失敗 ハプニング 爆笑」で13本取れる。
-    ('itai',     '痛い',       ['失敗 ハプニング 爆笑'],                              'medium',
+    # 実測 2026-09-02: 上の1語だけだと31日で20本→表示10本。「ハプニング 集」を足すと+47本(2,000回超25本)。
+    ('itai',     '痛い',       ['失敗 ハプニング 爆笑', 'ハプニング 集'],             'medium',
      '見てるこっちが痛い、やらかしの記録。'),
     # 借金は独立させず「お金」に統合。守り(節約・借金)と攻め(投資)の2クエリで
     # 家計から資産形成までを1つの棚に収める（内田さん指示 2026-08-27）。
@@ -283,16 +317,39 @@ def unplayable(it):
     return None
 
 
-def hydrate(ids):
+def landscape(it):
+    """横長なら True、縦(ショート)なら False、判定材料が無ければ None。
+
+    player.embedWidth / embedHeight は videos.list に maxHeight を付けた時だけ返る公式の値。
+    横長は 1080x720、縦は 405x720、正方形は 720x720（2026-09-02 実測）。正方形も
+    16:9 のカードでは左右が空くので横長扱いにしない。
+    """
+    pl = it.get('player') or {}
+    try:
+        w, h = int(pl.get('embedWidth') or 0), int(pl.get('embedHeight') or 0)
+    except (TypeError, ValueError):
+        return None
+    if not w or not h:
+        return None
+    return w > h
+
+
+def hydrate(ids, drop_vertical=True):
     """IDリスト -> 実統計付きデータ。videos.list は50件までなので分割して呼ぶ。
 
     videos.list のクォータは part の数に関係なく 1ユニット固定なので、
-    status を足しても消費は増えない。
+    status や player を足しても消費は増えない。
+
+    🚨 縦動画(ショート)の判定は **長さではなく縦横比** で行う（2026-09-02）。
+       ショートは今は3分まで作れるので「70秒以下」の判定では 2〜3分の縦動画が素通りし、
+       エンタメのベスト3が全部縦動画（16:9カードで上下が切れる）になっていた。
+       ⚠️ 値が返らない動画は弾かない（証拠がある時だけ弾く＝守りすぎて棚を空にしない）。
+       うっちーPの歌と固定枠は drop_vertical=False（自分の動画は縦でも載せる）。
     """
     out, dropped = [], []
     for i in range(0, len(ids), 50):
-        v = api('videos', {'part': 'snippet,statistics,contentDetails,status',
-                           'id': ','.join(ids[i:i + 50]), 'maxResults': 50})
+        v = api('videos', {'part': 'snippet,statistics,contentDetails,status,player',
+                           'id': ','.join(ids[i:i + 50]), 'maxResults': 50, 'maxHeight': 720})
         for it in v.get('items', []):
             st = it.get('statistics', {})
             if 'viewCount' not in st:          # 再生数非公開はランキングに載せられない
@@ -300,6 +357,10 @@ def hydrate(ids):
             why = unplayable(it)
             if why:                            # 観られない動画は載せない＝下位が自動で繰り上がる
                 dropped.append(why)
+                continue
+            land = landscape(it)
+            if drop_vertical and land is False:
+                dropped.append('vertical')     # 縦動画はカードに合わないので載せない
                 continue
             sn = it['snippet']
             th = sn.get('thumbnails', {})
@@ -313,6 +374,7 @@ def hydrate(ids):
                 # 秒数も持つ。カテゴリ別急上昇には videoDuration の絞り込みが無いので、
                 # Shorts(縦動画)をここで弾くために使う。
                 '_secs': dur_seconds(it.get('contentDetails', {}).get('duration', '')),
+                'landscape': land,             # True=横長 / False=縦 / None=判定不能
                 'thumb': (th.get('medium') or th.get('high') or th.get('default') or {}).get('url', ''),
             })
     if dropped:
@@ -413,6 +475,57 @@ def write_json(path, obj):
     os.replace(tmp, path)
 
 
+_pool = None            # pool.json の中身（起動時に1回だけ読む）
+_pool_dirty = False
+
+
+def _now_jst():
+    """GitHub Actions は UTC で動くので、記録・表示はすべて日本時間に揃える。"""
+    return datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=9)
+
+
+def pool_key(key, days, queries):
+    """キャッシュの鍵は「棚・窓・検索語」の組。検索語を差し替えた日に古い語の結果を再利用しないため。"""
+    return '%s:%d:%s' % (key, days, '|'.join(queries or []))
+
+
+def pool_get(key, days, queries=None):
+    """直近 POOL_TTL_H 時間以内に同じ条件で取った検索結果(動画IDの一覧)があれば返す。無ければ None。"""
+    global _pool
+    if _pool is None:
+        _pool = read_json(POOL, {})
+    e = _pool.get(pool_key(key, days, queries))
+    if not e or not e.get('ids'):
+        return None
+    try:
+        t = datetime.datetime.strptime(e.get('fetched', ''), '%Y-%m-%d %H:%M')
+        age_h = (_now_jst().replace(tzinfo=None) - t).total_seconds() / 3600.0
+    except Exception:
+        return None
+    if age_h < 0 or age_h > POOL_TTL_H:
+        return None
+    print('   └ 検索プール再利用（%.1fh前に取得・検索0回）' % age_h)
+    return list(e['ids'])
+
+
+def pool_put(key, days, ids, queries=None):
+    global _pool, _pool_dirty
+    if _pool is None:
+        _pool = read_json(POOL, {})
+    # 同じ棚の古い鍵（前の検索語・前の窓）は消す＝ファイルが際限なく育たない
+    for k in [k for k in _pool if k.split(':')[0] == key]:
+        del _pool[k]
+    _pool[pool_key(key, days, queries)] = {'fetched': _now_jst().strftime('%Y-%m-%d %H:%M'),
+                                           'ids': list(ids)}
+    _pool_dirty = True
+
+
+def pool_save():
+    """変更があった時だけ書く（差分の無い日に commit を汚さない）。"""
+    if _pool is not None and _pool_dirty:
+        write_json(POOL, _pool)
+
+
 def older_than_a_day(asof, now):
     """引き継いだデータが本当に古いかを、日付ではなく**経過時間**で判定する。
 
@@ -429,7 +542,7 @@ def older_than_a_day(asof, now):
         return True
 
 
-def theme_videos(queries, dur, window=None):
+def theme_videos(queries, dur, window=None, key=None):
     """検索でそのジャンルの候補を集める。**窓は1つ、検索は1クエリ1回だけ**。
 
     🚨 期間を絞る理由（2026-08-26 実測で判明した最大の欠陥）:
@@ -448,11 +561,15 @@ def theme_videos(queries, dur, window=None):
     global _last_window
     days = window or FILL_DAYS
     _last_window = '直近%d日' % days
-    ids = []
-    for q in queries:
-        for vid in search_ids(q, dur, days):
-            if vid not in ids:                 # 同じ動画が2クエリに出るので重複除去
-                ids.append(vid)
+    ids = pool_get(key, days, queries) if key else None  # 同じ日の再実行なら検索せずIDを再利用
+    if ids is None:
+        ids = []
+        for q in queries:
+            for vid in search_ids(q, dur, days):
+                if vid not in ids:             # 同じ動画が2クエリに出るので重複除去
+                    ids.append(vid)
+        if key:
+            pool_put(key, days, ids, queries)
     # ここでは cap_channel を掛けない。プールを先に3本/chへ絞ると、
     # rank_today() が「その日の伸び」で選ぶ前に再生数順で切られてしまうため。
     vids = dedupe_titles(sorted(hydrate(ids), key=lambda x: -x['views']))
@@ -493,8 +610,8 @@ def category_videos(cats, dur):
         vids = [x for x in vids if x.get('_secs', 0) >= LONG_MIN_SEC]
     else:
         vids = [x for x in vids if x.get('_secs', 0) > SHORTS_MAX_SEC]
-    # 70秒超でも #shorts と名乗る動画は縦のことが多く、16:9カードだと上下が切れる
-    vids = [x for x in vids if '#shorts' not in x['title'].lower()]
+    # 縦横比は hydrate() が弾く。ここは名乗りだけの保険（#short / #shorts / #shortvideo）
+    vids = [x for x in vids if '#short' not in x['title'].lower()]
     vids = dedupe_titles(vids)
     ng = CATEGORY_EXCLUDE.get(_cat_key or '')
     if ng:
@@ -505,7 +622,10 @@ def category_videos(cats, dur):
     return vids
 
 
-def rank_today(pool, hist, hof_ids, keep_order=False, max_age=TODAY_MAX_AGE):
+_last_top_age = 0       # 直近の rank_today でベスト3に使った最古の公開日数（タブの説明に出す）
+
+
+def rank_today(pool, hist, hof_ids, keep_order=False, tiers=NORMAL_TIERS, block=frozenset()):
     """上の段（今日の1・2・3）の並び順を決める。
 
     🚨 ここが「上の段と下の段で同じ画面が出ないようにする」中核（内田さん指定 2026-08-26）。
@@ -517,12 +637,21 @@ def rank_today(pool, hist, hof_ids, keep_order=False, max_age=TODAY_MAX_AGE):
          普通は被らないが、90日以内に出た歴代級の特大ヒットだけは両方に載りうるため。
       3. 伸びのデータが足りない日（初回ビルド等）は総再生数順にフォールバックする。
          並びが多少弱くなっても、空にするよりはるかにマシ。
+
+    🚨 2026-09-02 ベスト3の選び方を「新しい層から順に」へ変更（内田さん指摘）:
+      tiers=(3,7,14) なら、まず公開3日以内の候補から別チャンネルで3本埋める。足りない分だけ
+      7日以内→14日以内へ広げる。上限の内側なら何日前でも同列、だった以前の方式では
+      伸びの絶対量が大きい古い動画が何日も居座り、通常タブのベスト3は公開16〜26日前が普通だった。
+      block には「連日居座り(streak上限)」「先に他タブへ出した動画」を渡す。ベスト3からは外すが
+      4位以下には残す（消さない）。block を除くと3本に満たない時だけ block も許す＝棚を空にしない。
     """
-    global _last_mode
+    global _last_mode, _last_top_age
     live = [v for v in pool if v['videoId'] not in hof_ids]
     if not live:
         live = list(pool)                          # 全部が殿堂入りなら除外は諦める（空にしない）
+    n_hof = len(pool) - len(live)
 
+    max_age = tiers[-1]
     # 🚨 最終防波堤（2026-08-27）。ここまでのどの経路を通っても、
     #    上の段には max_age より古い動画を出さない。前日引き継ぎで歳を取った分もここで落ちる。
     #    ただし全部落ちて空になるくらいなら、新しい順に3本だけ残す（空はタブを殺すため）。
@@ -540,27 +669,63 @@ def rank_today(pool, hist, hof_ids, keep_order=False, max_age=TODAY_MAX_AGE):
 
     if keep_order:
         # カテゴリ別急上昇は YouTube 側の並びがそのまま「今日の勢い」。自前で並べ替えない。
-        _last_mode = '急上昇順（YouTube判定）'
-        out = spread_top3(cap_channel(live))[:LIST_N]
-        print('   └ 上の段: %s / 候補%d本→%d本' % (_last_mode, len(pool), len(out)))
-        return out
-    for v in live:
-        prev = hist.get(v['videoId'])
-        v['delta'] = (v['views'] - prev) if isinstance(prev, int) else None
-    buzz = [v for v in live if isinstance(v.get('delta'), int) and v['delta'] > 0]
-    # 閾値を20本固定にすると、候補プールの小さいジャンルが永久に伸び順にならない。
-    # 「上位3枚を伸び順で埋められるだけの本数」があれば伸び順を採用する。
-    need = max(3, min(LIST_N, len(live) // 2))
-    if len(buzz) >= need:
-        ordered = sorted(buzz, key=lambda x: -x['delta'])
-        mode = '前日からの伸び順'
+        mode = '急上昇順（YouTube判定）'
+        ordered = list(live)
     else:
-        ordered = sorted(live, key=lambda x: -x['views'])
-        mode = '再生回数順（前日比のデータが%d本しか無いため）' % len(buzz)
+        for v in live:
+            prev = hist.get(v['videoId'])
+            v['delta'] = (v['views'] - prev) if isinstance(prev, int) else None
+        buzz = [v for v in live if isinstance(v.get('delta'), int) and v['delta'] > 0]
+        # 閾値を20本固定にすると、候補プールの小さいジャンルが永久に伸び順にならない。
+        # 「上位3枚を伸び順で埋められるだけの本数」があれば伸び順を採用する。
+        need = max(3, min(LIST_N, len(live) // 2))
+        if len(buzz) >= need:
+            # 🚨 前日比が無い動画（＝今日初めて候補に入った新しい動画）を落とさない（2026-09-02）。
+            #    以前は伸び順の日は buzz だけを並べていたので、いちばん新しい動画が
+            #    「履歴が無い」という理由で初日は必ずベスト3から漏れていた（旬タブで致命的）。
+            #    伸び順の後ろに、履歴の無い動画を勢い(1日あたり再生数)順で繋ぐ。
+            newcomers = sorted([v for v in live if v.get('delta') is None],
+                               key=lambda x: -osusume_score(x))
+            ordered = sorted(buzz, key=lambda x: -x['delta']) + newcomers
+            mode = '前日からの伸び順'
+        else:
+            ordered = sorted(live, key=lambda x: -x['views'])
+            mode = '再生回数順（前日比のデータが%d本しか無いため）' % len(buzz)
     _last_mode = mode
-    out = spread_top3(cap_channel(ordered))[:LIST_N]
-    print('   └ 上の段: %s / 候補%d本→%d本（殿堂入り除外%d本）'
-          % (mode, len(pool), len(out), len(pool) - len(live)))
+    ordered = cap_channel(ordered)
+
+    # ── ベスト3: 新しい層から、別チャンネルで、居座り・他タブ既出を避けて埋める ──
+    top, used_ch, picked = [], set(), set()
+
+    def take(cands):
+        for v in cands:
+            if len(top) >= 3:
+                return
+            if v['videoId'] in picked or v['channelTitle'] in used_ch:
+                continue
+            top.append(v)
+            picked.add(v['videoId'])
+            used_ch.add(v['channelTitle'])
+
+    for t in tiers:
+        # 大きく出るカードには再生数の下限を置く。新しいだけで誰も観ていない動画を
+        # 1位にしない（実測: アイドルの3日以内は24回・85回・498回だった）。
+        take([v for v in ordered if age_days(v) <= t and v['videoId'] not in block
+              and v.get('views', 0) >= FILL_MIN_VIEWS])
+        if len(top) >= 3:
+            break
+    if len(top) < 3:                               # 居座り・既出・下限を除くと埋まらない → 許す
+        take([v for v in ordered if v['videoId'] not in picked])
+    if len(top) < 3:                               # それでも足りなければチャンネル重複も許す
+        used_ch.clear()
+        take([v for v in ordered if v['videoId'] not in picked])
+    rest = [v for v in ordered if v['videoId'] not in picked]
+    # 4位以下でも再生数が極端に少ないものは末尾へ（枠が余った時だけ出る）
+    rest.sort(key=lambda v: v.get('views', 0) < FILL_MIN_VIEWS)
+    out = (top + rest)[:LIST_N]
+    _last_top_age = max([age_days(v) for v in top] or [0])
+    print('   └ 上の段: %s / 候補%d本→%d本（殿堂入り除外%d本）／ベスト3は公開%d日以内'
+          % (mode, len(pool), len(out), n_hof, _last_top_age))
     return out
 
 
@@ -599,11 +764,13 @@ def demote_used(vids, keep_head=0):
     return head + unused + used
 
 
-def topup(vids, pool, hof, want=LIST_N):
+def topup(vids, pool, hof, want=LIST_N, max_age=FILL_DAYS):
     """ベスト3の鮮度はそのままに、4位以下を「おすすめ順」で20位まで埋める。
 
-    pool は31日の窓で取った候補一式。すでに載っているものと殿堂入りを除き、
+    pool は検索の窓で取った候補一式。すでに載っているものと殿堂入りを除き、
     再生数が極端に少ないものも外したうえで osusume_score の高い順に足す。
+    max_age より古いものは足さない（旬タブは14日・通常タブは31日。2026-09-02:
+    エンタメの末尾に31日前の訃報が毎日残っていた対策）。
     cap_channel は **足したあとの全体**に掛ける。ベスト3が先頭にあるので、
     先に確定した上位は必ず残り、同じチャンネルばかりが下に並ぶことだけを防げる。"""
     if len(vids) >= want:
@@ -611,13 +778,13 @@ def topup(vids, pool, hof, want=LIST_N):
     have = set(v['videoId'] for v in vids)
     cand = [v for v in pool
             if v['videoId'] not in have and v['videoId'] not in hof
-            and v.get('views', 0) >= FILL_MIN_VIEWS]
+            and v.get('views', 0) >= FILL_MIN_VIEWS and age_days(v) <= max_age]
     if not cand:
         return vids
     cand.sort(key=lambda x: -osusume_score(x))
     merged = cap_channel(vids + cand)[:want]
     print('   └ 4位以下を直近%d日のおすすめで補完: %d本 → %d本'
-          % (FILL_DAYS, len(vids), len(merged)))
+          % (max_age, len(vids), len(merged)))
     return merged
 
 
@@ -672,7 +839,7 @@ def scan_own_channel():
         pages += 1
         if not token or pages > 200:           # 暴走ガード
             break
-    vids = hydrate(ids)
+    vids = hydrate(ids, drop_vertical=False)   # 自分の動画は縦でも載せる
     vids.sort(key=lambda x: -x['views'])
     songs = [v for v in vids if any(h in v['title'] for h in SONG_HINT)][:60]
     write_json(OWNCH, {'channelId': CHANNEL_ID, 'scanned': len(vids),
@@ -696,7 +863,7 @@ def own_songs():
             stale = True
     if stale or not songs:
         songs = scan_own_channel()
-    fresh = hydrate([v['videoId'] for v in songs[:LIST_N]])
+    fresh = hydrate([v['videoId'] for v in songs[:LIST_N]], drop_vertical=False)
     fresh.sort(key=lambda x: -x['views'])
     return fresh[:LIST_N]
 
@@ -944,7 +1111,7 @@ def hof_pane(key, label, entry, on):
             '<p>公開日を問わない、これまででいちばん再生された動画です。ここは毎日は変わりません。</p></div>')
     if not vids:
         return pane('p-hof-' + key, on, head +
-                    '<p class="hnote">この棚はまだ集計中です。1日2ジャンルずつ順番に集めているので、'
+                    '<p class="hnote">この棚はまだ集計中です。1日' + str(HOF_PER_RUN) + 'ジャンルずつ順番に集めているので、'
                     '数日以内にここへ入ります。</p>')
     body = '<div class="top3">' + ''.join(card(v) for v in vids[:3]) + '</div>'
     if n > 3:
@@ -1025,7 +1192,15 @@ def render(d, hofc):
 
     body = nav + '<div class="panes">' + ''.join(panes) + '</div>'
     tpl = open(os.path.join(HERE, 'template.html'), encoding='utf-8').read()
-    out = tpl.replace('__BODY__', body).replace('__UPD__', d['updated'])
+    # フッターの説明文は定数から埋める。文言と実装が食い違うと「表示の嘘」になる
+    # （2026-09-02 まで「直近90日」「1日2ジャンル」と、とっくに変わった数字が残っていた）。
+    hof_cycle = -(-len(THEMES) // max(1, HOF_PER_RUN))
+    out = (tpl.replace('__BODY__', body).replace('__UPD__', d['updated'])
+              .replace('__T_HOT__', str(HOT_TIERS[0])).replace('__C_HOT__', str(HOT_TIERS[-1]))
+              .replace('__T_NORM__', str(NORMAL_TIERS[0])).replace('__C_NORM__', str(NORMAL_TIERS[-1]))
+              .replace('__STREAK__', str(TOP3_MAX_STREAK)).replace('__HOF_PER_RUN__', str(HOF_PER_RUN))
+              .replace('__HOF_CYCLE__', str(hof_cycle)).replace('__HOT_FILL__', str(HOT_FILL_DAYS))
+              .replace('__FILL__', str(FILL_DAYS)))
     with open(INDEX + '.tmp', 'w', encoding='utf-8') as f:
         f.write(out)
         f.flush()
@@ -1065,16 +1240,36 @@ def main():
     _pd = read_json(DATA, {})
     prev_themes = dict((t['key'], t) for t in _pd.get('themes', []) if t.get('key'))
     prev_updated = _pd.get('updated', '')
+    now_jst = _now_jst().strftime('%Y-%m-%d %H:%M')
+    # 🚨 同じ日に何度も走らない（2026-09-02）。daily.yml に予備の cron を複数置いたので、
+    #    直前のビルドが MIN_INTERVAL_H 以内なら何もしない。手動実行(FORCE=1)は例外。
+    if prev_updated and not os.environ.get('FORCE'):
+        try:
+            _gap = (datetime.datetime.strptime(now_jst, '%Y-%m-%d %H:%M') -
+                    datetime.datetime.strptime(prev_updated[:16], '%Y-%m-%d %H:%M')).total_seconds() / 3600.0
+        except Exception:
+            _gap = 10 ** 6
+        if 0 <= _gap < MIN_INTERVAL_H:
+            print('SKIP 直前のビルド(%s)から%.1fh。%dh未満なので今回は何もしない（予備cronの空振り）'
+                  % (prev_updated, _gap, MIN_INTERVAL_H))
+            return
     data = {'region': REGION, 'site': SITE_URL,
             # GitHub Actions は UTC で動くので、表示は日本時間に直す
-            'updated': (datetime.datetime.now(datetime.timezone.utc) +
-                        datetime.timedelta(hours=9)).strftime('%Y-%m-%d %H:%M'),
+            'updated': now_jst,
             'themes': []}
     newhist, failed, carried, pending = {}, [], [], []
-    # 大きく出るカードは各タブ3枚だけ。同じ動画が複数タブのベスト3に並ぶと
-    # 「まとめ」に見えないので、先に使われた3枚は後のタブのベスト3から外す
-    # （4位以下には残す＝在庫は減らさない）。2026-08-27: おもしろ と すごい で実際に発生。
-    featured = set()
+    # 🚨 連日居座りの記録（2026-09-02）。前回ベスト3だった動画の連続日数を引き継ぐ。
+    #    streak を持たない古い台帳は「1日目」とみなす。
+    #    大きく出るカードは各タブ3枚だけ。同じ動画が複数タブのベスト3に並ぶと「まとめ」に
+    #    見えないので、先に他タブへ出した動画(_used_ids)も rank_today の block に渡す。
+    prev_streak = {}
+    for _k, _t in prev_themes.items():
+        for _v in (_t.get('videos') or [])[:3]:
+            prev_streak[(_k, _v['videoId'])] = int(_v.get('streak') or 1)
+    # 連続「日数」であって連続「ビルド回数」ではない。同じ日に2回走っても+1しない
+    # （2026-09-02 夜に2回ビルドしたら1日で streak=2 になり、翌朝に全部入れ替わりかけた）。
+    same_day = bool(prev_updated) and prev_updated[:10] == now_jst[:10]
+    streak_step = 0 if same_day else 1
     # 殿堂入りキャッシュ。上の段から歴代組を外すために**取り直す前**の中身を使う。
     # （歴代はほぼ動かないので1日古くても実害が無く、循環参照を避けられる）
     hofc = load_hof()
@@ -1095,46 +1290,75 @@ def main():
                 vids = pool
             else:
                 hot = key in HOT_KEYS                     # 旬タブ=情報の鮮度が命
-                cap = HOT_MAX_AGE if hot else TODAY_MAX_AGE
+                tiers = HOT_TIERS if hot else NORMAL_TIERS
+                fill_max = HOT_FILL_DAYS if hot else FILL_DAYS
                 cat = CATEGORY.get(key)
                 hofset = hof_ids.get(key, set())
+                # ベスト3から外すもの: 連日居座り(streak上限) と 先に他タブへ出した動画。
+                # どちらも4位以下には残す（消さない）。
+                block = set(vid for (k2, vid), s in prev_streak.items()
+                            if k2 == key and s >= TOP3_MAX_STREAK) | set(_used_ids)
                 fill = []                                # 4位以下を埋めるための候補
                 if cat:
                     # カテゴリがある棚は検索を使わず1ユニット。急上昇の並びをそのまま使う
                     globals()['_cat_key'] = key
                     pool = category_videos(cat, dur)
-                    vids = rank_today(pool, hist, hofset, keep_order=True, max_age=cap)
-                    # 急上昇の非Shortsは日によって数本しか無い（実測: かわいい6本）。
-                    # ベスト3は急上昇のまま残し、4位以下だけ検索のおすすめで埋める。
-                    # 検索が尽きていても**ベスト3は必ず出る**ので、失敗しても続行する。
-                    if len(vids) < LIST_N and q:
+                    vids = rank_today(pool, hist, hofset, keep_order=True, tiers=tiers, block=block)
+                    fresh3 = [v for v in vids[:3] if age_days(v) <= tiers[-1]]
+                    # 急上昇の横長動画は日によって数本しか無い（実測: かわいい6本・エンタメ0本）。
+                    # ベスト3は急上昇を優先し、足りない分と4位以下を検索で埋める。
+                    # 検索が尽きていても**急上昇の分は必ず出る**ので、失敗しても続行する。
+                    if (len(vids) < LIST_N or len(fresh3) < 3) and q:
                         try:
-                            fill = theme_videos(q, dur)
+                            fill = theme_videos(q, dur, window=fill_max, key=key)
                         except Exception as e:
-                            print('   └ 4位以下の補完は検索が使えず見送り（%s）' % str(e)[:60])
+                            print('   └ 検索での補完は見送り（%s）' % str(e)[:60])
+                    if len(fresh3) < 3 and fill:
+                        # カテゴリだけではベスト3が埋まらない → 急上昇を先頭に、検索候補をおすすめ順で
+                        # 後ろに繋いで選び直す（急上昇の並びは崩さない）
+                        seen = set(v['videoId'] for v in pool)
+                        extra = sorted([v for v in fill if v['videoId'] not in seen],
+                                       key=lambda x: -osusume_score(x))
+                        print('   └ 急上昇だけでは%d日以内が%d本。検索候補%d本を混ぜて選び直す'
+                              % (tiers[-1], len(fresh3), len(extra)))
+                        pool = pool + extra
+                        vids = rank_today(pool, hist, hofset, keep_order=True, tiers=tiers, block=block)
+                        globals()['_last_window'] = '今日の急上昇＋直近%d日の検索' % fill_max
+                    else:
                         globals()['_last_window'] = '今日の急上昇（カテゴリ別）'
                 else:
-                    # カテゴリが無い棚は検索。**31日の窓で1回だけ**投げ、
-                    # ベスト3は上限(旬14日/通常30日)で絞り、残りをそのまま4位以下に回す。
-                    pool = theme_videos(q, dur)
-                    vids = rank_today(pool, hist, hofset, max_age=cap)
+                    # カテゴリが無い棚は検索。**1つの窓で1回だけ**投げ（旬14日／通常31日）、
+                    # ベスト3は新しい層から埋め、残りをそのまま4位以下に回す。
+                    pool = theme_videos(q, dur, window=fill_max, key=key)
+                    vids = rank_today(pool, hist, hofset, tiers=tiers, block=block)
                     fill = pool
                 if fill:
-                    vids = topup(vids, fill, hofset)
-                vids = demote_used(vids)
+                    vids = topup(vids, fill, hofset, max_age=fill_max)
+                # 4位以下に再生数が極端に少ない動画（数百回）を並べない。10本残るなら切る。
+                # 「20本埋める」より「人が見たいと思うものだけ」が内田さんの基準（2026-08-27）。
+                _ok = [v for v in vids if v.get('views', 0) >= FILL_MIN_VIEWS]
+                if len(_ok) >= 10 and len(_ok) < len(vids):
+                    print('   └ 再生%d回未満の%d本を外す（%d本→%d本）'
+                          % (FILL_MIN_VIEWS, len(vids) - len(_ok), len(vids), len(_ok)))
+                    vids = _ok
+                vids = demote_used(vids, keep_head=3)    # ベスト3は確定済み。4位以下だけ既出を後ろへ
                 for v in vids:
                     _used_ids.add(v['videoId'])
-                how = '%s／%s' % (_last_window, _last_mode)
+                how = '%s／%s／ベスト3は公開%d日以内' % (_last_window, _last_mode, _last_top_age)
         except Exception as e:                      # 1テーマ失敗で全体を落とさない
             print('NG %s: %s' % (label, str(e)[:160]))
             vids = None
         if vids and key not in ('trend', OWN_KEY):
-            # 先に他タブのベスト3になった動画を先頭から外し、まだ出ていないものを繰り上げる
-            head = [v for v in vids if v['videoId'] not in featured]
-            if len(head) >= 3:
-                vids = head + [v for v in vids if v['videoId'] in featured]
+            # 連続日数を記録する。ベスト3に入った動画は前回の値+1、外れた動画は消す。
+            for v in vids:
+                v.pop('streak', None)
             for v in vids[:3]:
-                featured.add(v['videoId'])
+                _p = prev_streak.get((key, v['videoId']))
+                v['streak'] = (_p + streak_step) if _p else 1
+            _long = [v for v in vids[:3] if v['streak'] > TOP3_MAX_STREAK]
+            if _long:
+                print('   └ ⚠️ 代わりが無く%d日目のベスト3を許容: %s'
+                      % (TOP3_MAX_STREAK + 1, ', '.join(v['title'][:20] for v in _long)))
         if not vids:
             # 🚨 前日分を引き継ぐ（2026-08-26 追加）。
             #    それまでは1テーマでも欠けると何も書かずに中断していたので、
@@ -1181,7 +1405,7 @@ def main():
         # 固定表示の1本があれば実データを取り直して添える（失敗しても本体は落とさない）
         if key in PINNED:
             try:
-                got = hydrate([PINNED[key]['videoId']])
+                got = hydrate([PINNED[key]['videoId']], drop_vertical=False)
                 if got:
                     theme['pinned'] = dict(got[0], lead=PINNED[key]['lead'], note=PINNED[key]['note'])
                     print('   └ pinned: %s' % got[0]['title'][:40])
@@ -1246,6 +1470,7 @@ def main():
 
     write_json(DATA, data)
     write_json(HIST, newhist)
+    pool_save()                                     # 検索プールを残す＝同じ日の再実行で検索枠を使わない
     size = render(data, hofc)
     write_sitemap()
     print('DONE themes=%d videos=%d bytes=%d failed=%s carried=%s' % (
@@ -1259,17 +1484,11 @@ def render_only():
     テンプレートをいじるたびにフルビルドしていると検索クォータが無駄に減るので、
     描画だけやり直せる口を用意しておく。
     """
+    # 台帳(data.json)は main() が並べ終えた最終形なので、ここでは並べ替えずそのまま描く。
+    # （以前はここで rank_today を掛け直していたが、旬タブの層や居座り判定を持たないまま
+    #   並べ直すので本番と違う画面になっていた。描画確認用の口が本番と違ってはいけない）
     data = read_json(DATA, {'updated': '', 'themes': []})
     hofc = load_hof()
-    hist = read_json(HIST, {})
-    hof_ids = dict((k, set(v['videoId'] for v in (e.get('videos') or [])))
-                   for k, e in hofc.items())
-    gkeys = set(t[0] for t in THEMES)
-    for t in data.get('themes', []):
-        if t['key'] in gkeys:                      # 上の段は殿堂入り除外を効かせて並べ直す
-            t['videos'] = rank_today(t['videos'], hist, hof_ids.get(t['key'], set()))
-            for r, v in enumerate(t['videos'], 1):
-                v['rank'] = r
     size = render(data, hofc)
     print('RENDER-ONLY bytes=%d themes=%d' % (size, len(data.get('themes', []))))
 
@@ -1294,8 +1513,9 @@ def fill_missing():
     added = []
     for key, label, queries, dur, note in todo:
         try:
-            pool = theme_videos(queries, dur)
-            vids = rank_today(pool, hist, set())
+            hot = key in HOT_KEYS
+            pool = theme_videos(queries, dur, window=HOT_FILL_DAYS if hot else FILL_DAYS, key=key)
+            vids = rank_today(pool, hist, set(), tiers=HOT_TIERS if hot else NORMAL_TIERS)
         except Exception as e:
             print('NG %s: %s' % (label, str(e)[:140])); continue
         if not vids:
