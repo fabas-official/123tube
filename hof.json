@@ -1,5 +1,5 @@
 {
- "updated": "2026-09-11",
+ "updated": "2026-09-12",
  "themes": {
   "meshi": {
    "updated": "2026-09-10",
@@ -3962,15 +3962,15 @@
    ]
   },
   "anime": {
-   "updated": "2026-09-05",
+   "updated": "2026-09-12",
    "videos": [
     {
      "videoId": "fduVKdHRP0o",
      "title": "エヴァンゲリオンがさらにわかる動画：旧",
      "channelTitle": "SORAYUNI",
      "publishedAt": "2012-09-02",
-     "views": 15766522,
-     "comments": 10677,
+     "views": 15775005,
+     "comments": 10678,
      "duration": "14:01",
      "_secs": 841,
      "landscape": true,
@@ -3978,120 +3978,120 @@
      "rank": 1
     },
     {
+     "videoId": "1ca_xwe8pQU",
+     "title": "最悪の結末を迎えるバッドエンドアニメ ４選",
+     "channelTitle": "キリン【考察系youtuber】",
+     "publishedAt": "2020-02-15",
+     "views": 4843268,
+     "comments": 4420,
+     "duration": "13:45",
+     "_secs": 825,
+     "landscape": true,
+     "thumb": "https://i.ytimg.com/vi/1ca_xwe8pQU/mqdefault.jpg",
+     "rank": 2
+    },
+    {
      "videoId": "DUqNTyX8_Js",
      "title": "【チェンソーマン考察】マキマの全てがわかる動画",
      "channelTitle": "ポチタch【チェンソーマン解説】",
      "publishedAt": "2021-08-20",
-     "views": 4031221,
-     "comments": 1230,
+     "views": 4033600,
+     "comments": 1229,
      "duration": "17:19",
      "_secs": 1039,
      "landscape": true,
      "thumb": "https://i.ytimg.com/vi/DUqNTyX8_Js/mqdefault.jpg",
-     "rank": 2
+     "rank": 3
     },
     {
      "videoId": "tpnY2VmwZXI",
      "title": "【ゆっくり解説】閲覧注意アニメ【上級編】",
      "channelTitle": "社畜系YouTuber",
      "publishedAt": "2020-02-16",
-     "views": 2820828,
+     "views": 2821043,
      "comments": 3659,
      "duration": "12:13",
      "_secs": 733,
      "landscape": true,
      "thumb": "https://i.ytimg.com/vi/tpnY2VmwZXI/mqdefault.jpg",
-     "rank": 3
+     "rank": 4
     },
     {
      "videoId": "IdHoXEEehfw",
      "title": "【単純明快】サルでもわかる！クロロ対ヒソカ完全解説【ハンターハンター】",
      "channelTitle": "パンダさん【マンガ考察系チャンネル】",
      "publishedAt": "2022-07-01",
-     "views": 2731498,
-     "comments": 1533,
+     "views": 2768430,
+     "comments": 1535,
      "duration": "16:24",
      "_secs": 984,
      "landscape": true,
      "thumb": "https://i.ytimg.com/vi/IdHoXEEehfw/mqdefault.jpg",
-     "rank": 4
+     "rank": 5
     },
     {
      "videoId": "x2Ok2tPX804",
      "title": "【ゆっくり解説】放送禁止レベル。国民的アニメのトラウマ回4選【閲覧注意】",
      "channelTitle": "闇雑学ラボ【ゆっくり解説】",
      "publishedAt": "2021-10-02",
-     "views": 2595076,
+     "views": 2602299,
      "comments": 880,
      "duration": "15:19",
      "_secs": 919,
      "landscape": true,
      "thumb": "https://i.ytimg.com/vi/x2Ok2tPX804/mqdefault.jpg",
-     "rank": 5
+     "rank": 6
     },
     {
      "videoId": "TCfc6RxFySw",
      "title": "アニメを死ぬほど見てきた岡田斗司夫が王道アニメを採点する動画【岡田斗司夫 切り抜き】",
      "channelTitle": "岡田の部屋【岡田斗司夫 切り抜き】",
      "publishedAt": "2021-06-21",
-     "views": 2485466,
-     "comments": 1088,
+     "views": 2493763,
+     "comments": 1086,
      "duration": "5:04",
      "_secs": 304,
      "landscape": true,
      "thumb": "https://i.ytimg.com/vi/TCfc6RxFySw/mqdefault.jpg",
-     "rank": 6
+     "rank": 7
     },
     {
      "videoId": "9Leo7Nrp4c4",
      "title": "【シンエヴァンゲリオン考察】この動画でマリの全てがわかります。【ゆっくり解説】",
      "channelTitle": "シトch【エヴァンゲリオン解説】",
      "publishedAt": "2021-03-29",
-     "views": 2415789,
-     "comments": 1527,
+     "views": 2416551,
+     "comments": 1528,
      "duration": "10:47",
      "_secs": 647,
      "landscape": true,
      "thumb": "https://i.ytimg.com/vi/9Leo7Nrp4c4/mqdefault.jpg",
-     "rank": 7
+     "rank": 8
     },
     {
      "videoId": "MRdU5Q9iNjU",
      "title": "【天才 冨樫】さすがです！回収済み伏線１１個まとめたらヤバすぎた【ハンターハンター】",
      "channelTitle": "パンダさん【マンガ考察系チャンネル】",
      "publishedAt": "2022-06-20",
-     "views": 2210854,
-     "comments": 776,
+     "views": 2233086,
+     "comments": 779,
      "duration": "17:10",
      "_secs": 1030,
      "landscape": true,
      "thumb": "https://i.ytimg.com/vi/MRdU5Q9iNjU/mqdefault.jpg",
-     "rank": 8
+     "rank": 9
     },
     {
      "videoId": "kh90QikwTUM",
      "title": "【チェンソーマン考察】レゼの全てがわかる動画",
      "channelTitle": "ポチタch【チェンソーマン解説】",
      "publishedAt": "2021-09-17",
-     "views": 2129139,
+     "views": 2131132,
      "comments": 1308,
      "duration": "15:50",
      "_secs": 950,
      "landscape": true,
      "thumb": "https://i.ytimg.com/vi/kh90QikwTUM/mqdefault.jpg",
-     "rank": 9
-    },
-    {
-     "videoId": "dEuU7WGwvaw",
-     "title": "【デスノート考察】Lがテレビinポテチ成功後の夜神月を疑ったのは何故か",
-     "channelTitle": "雪だるま.",
-     "publishedAt": "2023-05-10",
-     "views": 2129062,
-     "comments": 966,
-     "duration": "14:42",
-     "_secs": 882,
-     "landscape": true,
-     "thumb": "https://i.ytimg.com/vi/dEuU7WGwvaw/mqdefault.jpg",
      "rank": 10
     },
     {
@@ -4099,8 +4099,8 @@
      "title": "【ゆっくり解説】苦情殺到で放送禁止に。子供向けアニメのトラウマ回7選【閲覧注意】",
      "channelTitle": "闇雑学ラボ【ゆっくり解説】",
      "publishedAt": "2021-09-25",
-     "views": 1924290,
-     "comments": 1422,
+     "views": 1931883,
+     "comments": 1424,
      "duration": "17:26",
      "_secs": 1046,
      "landscape": true,
@@ -4112,8 +4112,8 @@
      "title": "【ハンターハンター考察】幻影旅団の死亡メンバー5人の無残な最後シーンまとめ【HUNTER×HUNTER考察】",
      "channelTitle": "ハンターハンターの真実",
      "publishedAt": "2020-07-20",
-     "views": 1858854,
-     "comments": 683,
+     "views": 1865770,
+     "comments": 684,
      "duration": "7:12",
      "_secs": 432,
      "landscape": true,
@@ -4121,107 +4121,107 @@
      "rank": 12
     },
     {
-     "videoId": "pQ7QmbYNifA",
-     "title": "上弦の壱・黒死牟、最終形態の考察。誇り高き武士が醜い姿になった理由",
-     "channelTitle": "鬼滅の刃【まったり解説】",
-     "publishedAt": "2022-04-02",
-     "views": 1776182,
-     "comments": 279,
-     "duration": "15:03",
-     "_secs": 903,
-     "landscape": true,
-     "thumb": "https://i.ytimg.com/vi/pQ7QmbYNifA/mqdefault.jpg",
-     "rank": 13
-    },
-    {
      "videoId": "uQ-9wg4JpEc",
      "title": "㊗️170万回再生‼️驚愕の理由で視聴者ブチギレ。実際にBPOに意見を寄せられたアニメ7選【ゆっくり解説】",
      "channelTitle": "ゆっくりアニメ闇図鑑",
      "publishedAt": "2023-01-27",
-     "views": 1756178,
-     "comments": 730,
+     "views": 1772637,
+     "comments": 731,
      "duration": "17:16",
      "_secs": 1036,
      "landscape": true,
      "thumb": "https://i.ytimg.com/vi/uQ-9wg4JpEc/mqdefault.jpg",
-     "rank": 14
+     "rank": 13
     },
     {
      "videoId": "JVYlJftH_zU",
      "title": "【チェンソーマン考察】サンタクロースの全てがわかる動画",
      "channelTitle": "ポチタch【チェンソーマン解説】",
      "publishedAt": "2021-12-02",
-     "views": 1748385,
+     "views": 1748963,
      "comments": 644,
      "duration": "11:54",
      "_secs": 714,
      "landscape": true,
      "thumb": "https://i.ytimg.com/vi/JVYlJftH_zU/mqdefault.jpg",
-     "rank": 15
+     "rank": 14
     },
     {
      "videoId": "B6rvJh3e6AU",
      "title": "【デスノート】最終回のその後！【ゆっくり解説】",
      "channelTitle": "ゆっくりデスノート",
      "publishedAt": "2023-07-14",
-     "views": 1626197,
-     "comments": 496,
+     "views": 1642025,
+     "comments": 498,
      "duration": "11:19",
      "_secs": 679,
      "landscape": true,
      "thumb": "https://i.ytimg.com/vi/B6rvJh3e6AU/mqdefault.jpg",
-     "rank": 16
+     "rank": 15
     },
     {
      "videoId": "7sjcRD8vjDY",
      "title": "【葬送のフリーレン】たった2秒の原作改変がヤバい？涙のシーンを改変した本当の理由..原作では描かれなかった神回を原作と比較しながら解説します【2023年秋アニメ】【2023年アニメ】【おすすめアニメ】",
      "channelTitle": "ミシマ.",
      "publishedAt": "2023-10-15",
-     "views": 1583353,
+     "views": 1584624,
      "comments": 718,
      "duration": "12:15",
      "_secs": 735,
      "landscape": true,
      "thumb": "https://i.ytimg.com/vi/7sjcRD8vjDY/mqdefault.jpg",
-     "rank": 17
+     "rank": 16
     },
     {
      "videoId": "AYL2MfcC2q4",
      "title": "【進撃の巨人】エレンの壮絶な人生まとめ！最終話の真相を知った上で考察した結果がヤバイ...",
      "channelTitle": "シン考察ch",
      "publishedAt": "2021-07-17",
-     "views": 1537418,
+     "views": 1538921,
      "comments": 509,
      "duration": "11:07",
      "_secs": 667,
      "landscape": true,
      "thumb": "https://i.ytimg.com/vi/AYL2MfcC2q4/mqdefault.jpg",
-     "rank": 18
+     "rank": 17
     },
     {
      "videoId": "cWYkq4HVcmE",
      "title": "【NARUTO】5大隠れ里最強ランキング【ナルト解説/考察】",
      "channelTitle": "木の葉チャンネル",
      "publishedAt": "2022-03-12",
-     "views": 1413692,
-     "comments": 1079,
+     "views": 1414474,
+     "comments": 1078,
      "duration": "10:12",
      "_secs": 612,
      "landscape": true,
      "thumb": "https://i.ytimg.com/vi/cWYkq4HVcmE/mqdefault.jpg",
-     "rank": 19
+     "rank": 18
     },
     {
      "videoId": "JPc20VVOe6o",
      "title": "【まどマギ】意味が分かると怖い！魔法少女5人の願いとその結末…【ゆっくり解説】",
      "channelTitle": "死に戻りアニメ解説【ゆっくり】",
      "publishedAt": "2022-06-04",
-     "views": 1401497,
+     "views": 1407589,
      "comments": 659,
      "duration": "18:23",
      "_secs": 1103,
      "landscape": true,
      "thumb": "https://i.ytimg.com/vi/JPc20VVOe6o/mqdefault.jpg",
+     "rank": 19
+    },
+    {
+     "videoId": "ZcyQ-IABhjM",
+     "title": "【ヒロアカ最終431話】本当の最終回がヤバすぎる…！コミックス限定のアフターストーリでヒロアカ最大の謎がついに解明されました※ネタバレあり",
+     "channelTitle": "オールマイ子【ジャンプ漫画考察】",
+     "publishedAt": "2024-12-04",
+     "views": 1352851,
+     "comments": 909,
+     "duration": "13:10",
+     "_secs": 790,
+     "landscape": true,
+     "thumb": "https://i.ytimg.com/vi/ZcyQ-IABhjM/mqdefault.jpg",
      "rank": 20
     }
    ]
