@@ -1,5 +1,5 @@
 {
- "note": "Japan Buzz (EN) channel blocklist. Exact match after normalization (norm_ch), same scheme as the JP site's blocklist.json. Seeded 2026-09-03 from measure_en*.py real-query results (scratchpad) and from the first production build of en/data.json. Two groups: (A) channels observed polluting the ADOPTED query 'anime amv edit' (off-topic Tamil/political edits, AI-generated content, editing-app tutorials mislabeled as anime, unrelated movie AMVs) — these DID make it into the live candidate pool and needed removal. (B) channels observed dominating the REJECTED query 'anime explained' (Hindi/Urdu narration mass-production) — not adopted for the live theme, kept here defensively in case a future query change surfaces them again, per memory project_123tube_youtube_matome_site_2026-08-26.md.",
+ "note": "Japan Buzz (EN) channel blocklist. Exact match after normalization (norm_ch), same scheme as the JP site's blocklist.json. Seeded 2026-09-03 from measure_en*.py real-query results (scratchpad) and from the first production build of en/data.json. Two groups: (A) channels observed polluting the ADOPTED query 'anime amv edit' (off-topic Tamil/political edits, AI-generated content, editing-app tutorials mislabeled as anime, unrelated movie AMVs) — these DID make it into the live candidate pool and needed removal. (B) channels observed dominating the REJECTED query 'anime explained' (Hindi/Urdu narration mass-production) — not adopted for the live theme, kept here defensively in case a future query change surfaces them again, per memory project_123tube_youtube_matome_site_2026-08-26.md. 2026-10-09: added 'WWII Desk' (war-history narration that passes the Food shelf's food-word rule; seen in the 'japan food' 7-day search).",
  "channels": [
   "MADARA",
   "ANIMES AI",
@@ -16,6 +16,7 @@
   "Anokhi Films",
   "Filmaze Explain",
   "AKFC ANIME",
-  "Rainimator"
+  "Rainimator",
+  "WWII Desk"
  ]
 }

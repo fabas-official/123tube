@@ -247,7 +247,7 @@ THEMES = [
 #            猫 7日（50本取れるが、棚に並べたら20本中7本が猫の動画でなかった: 猫ミームの歴史語り・
 #            VRゲーム・歌ってみた・ニュース。保護猫 は上位22本が全部猫の動画だった）
 # THEMES 側の語は変えていない（殿堂入りの検索にも使っているので、そちらを巻き込まないため）。
-# 検索は1日+7回（1回100ユニット）。1ビルドは JP 18回＋殿堂入り＋EN 4回で、9/2 に 62回/日 を投げて
+# 検索は1日+7回（1回100ユニット）。1ビルドは JP 18回＋殿堂入り＋EN 7回（うち新着3回・FRESH_EN）で、9/2 に 62回/日 を投げて
 # 429 が出なかった範囲に収まる。新着が取れなかった日は元の候補だけで棚を作る（棚は落とさない）。
 FRESH = {
     'kane':     [('投資', 'medium', 3), ('節約 貯金', 'medium', 7)],
@@ -311,9 +311,10 @@ SONG_HINT = ('作詞', 'Fabas', 'ファバス', 'オリジナル曲', 'MV', 'ミ
 # 4タブとも search ベース(theme_videos)・NORMAL_TIERS(7/14/30日)・FILL_DAYS(31日)・
 # FILL_MIN_VIEWS(2000)・pool.json(12h再利用)・縦動画除外・streak連続居座り防止は日本版と完全に同じ仕組みを流用する。
 THEMES_EN = [
+    # 2026-10-09: 説明文に公式の予告を足した（新着の検索 FRESH_EN で予告が並ぶようになったため。棚の中身と説明を揃える）。
     ('anime', 'Anime', ['anime amv edit'], 'medium',
-     "Fan edits and AMVs buzzing right now — the clip culture that made anime travel "
-     "outside Japan in the first place. No full-episode reposts."),
+     "Official trailers for what's airing next, plus the fan edits and AMVs buzzing right now — the clip "
+     "culture that made anime travel outside Japan in the first place. No full-episode reposts."),
     ('travel', 'Travel', ['japan travel vlog'], 'medium',
      'Real trips, real reactions — what it actually looks like to travel Japan right now.'),
     ('food', 'Food', ['japan food tour'], 'medium',
@@ -331,9 +332,92 @@ THEMES_EN = [
 # 「Anime」も同様に、編集チュートリアルや無関係な楽曲マッシュアップが「AMV」タグ経由で混ざるため、
 # タイトルに anime/amv のいずれかを含むものだけに絞る（Bleach/Demon Slayer等の作品名だけのAMVタイトルは
 # 通常「AMV」を明記するので実害は小さい。取りこぼしは許容し、消すのではなく1件ずつ blocklist で対処する）。
-TOPIC_KEYWORDS_EN = {'anime':  ('anime', 'amv'),
+# 2026-10-09: Anime に予告の語を足した。公式の予告は題名に anime と書かない
+# （例「Dragon Ball Super: Beerus | Official Trailer | Crunchyroll」）ので、足さないと新着の検索の26本が9本に減る。
+# 「trailer」1語にしなかったのは、ゲーム・ディズニー・ファン作の「Teaser Trailer Concept」まで通るため。
+TOPIC_KEYWORDS_EN = {'anime':  ('anime', 'amv', 'official trailer', 'official teaser', 'crunchyroll', 'aniplex'),
                      'travel': ('japan', 'tokyo', 'kyoto', 'osaka'),
                      'food':   ('japan', 'tokyo', 'kyoto', 'osaka')}
+# 🆕 2026-10-09: 話題の決まりを2つ足した。新着の検索で入ってくる候補を棚に合わせるためで、元の候補にも同じく掛ける。
+#   Food は「上の地名の語 かつ 食べ物の語」。japan food 直近7日の上位20本には新幹線・ゆず村・戦史・朝の習慣・
+#   旅行の日記が8本混ざっていた。食べ物の語を求めると 30本→18本（食の動画11本・食事の出てくる暮らしの日記6本・
+#   戦史1本＝en/blocklist.json へ）。朝の候補は 29本→24本。語は単語の頭と尻で照合する（eat が great に当たらないように）。
+#   Anime は題名の除外語。編集チュートリアル（修正リスト 2026-09-05 の B-1）・リアクション・ゲーム内の「anime」を外す。
+#   朝の候補は下の言語の決まりと合わせて 31本→17本（他の言語14本・チュートリアル等4本）。
+TOPIC_REQUIRE_EN = {'food': re.compile(
+    r'\b(?:food|foodie|ramen|sushi|sashimi|udon|soba|noodle|curry|izakaya|wagyu|bento|yakiniku|yakitori|tempura|'
+    r'tonkatsu|katsu|gyoza|takoyaki|okonomiyaki|onigiri|donburi|omurice|matcha|mochi|eat|ate|restaurant|chef|cook|'
+    r'kitchen|meal|dish|feast|buffet|bakery|dessert|sweet|snack|sandwich|burger|pizza|konbini|convenience store|'
+    r'breakfast|lunch|dinner|cafe|market|delicious|tasty|taste|chicken|beef|pork|seafood|crab)(?:s|es|ing|ed)?\b')}
+#   react は reaction / reacts / REACT をまとめて拾う（作り直した棚に「AMV NOOBS REACT to …」が14位で出た）。
+TOPIC_EXCLUDE_EN = {'anime': ('tutorial', 'react', 'roblox', 'fortnite')}
+
+# ── 英語版: 他の言語の動画を外す（2026-10-09 追加） ─────────────────────────────
+# 題名がローマ字でも中身はヒンディー語・スペイン語、という動画は題名の文字種では見分けられない
+# （2026-09-05 の点検で Travel 20本中9〜10本がインド系だった。outputs/pm/japan_buzz_fix_list_2026-09-05.md の A-2）。
+# videos.list の snippet.defaultAudioLanguage（音声）と defaultLanguage（題名）を読む。hydrate() がすでに取っている
+# part=snippet の中にあるので追加の消費は無い。2026-10-09 実測（直近7日の候補・2,000回以上）:
+#    japan travel vlog 37本中 hi6・ur2・id1・te1・th1・bn1 ／ amv 29本中 es系9・vi1・de1・hu1 ／
+#    japan food 30本中 zh1・es1・te1・hi1
+# 🚨 「英語だけ残す」にはしない。公式の予告もAMVも音声は日本語で（anime official trailer 26本中 ja16本）、
+#    日本の暮らしの動画にも ja がある。残すのは 英語・日本語・言語なし(zxx)・不明(und) と、**申告が無い動画**。
+#    どちらかの欄に他の言語が書いてある時だけ外す（証拠がある時だけ弾く＝ unplayable() と同じ考え方）。
+#    申告は英語なのに中身がタガログ語、という動画は残る（見つけたら en/blocklist.json へ）。
+EN_LANG_OK = ('en', 'ja', 'zxx', 'und')
+# 申告が無くても、題名に言語の名前が書いてあれば外す（作り直した Anime の8位に「GOKU VS FRIEZA FIGHT IN HINDI」が
+# 申告なしで出た）。2026-10-09 の候補143本で当たったのはこの1本だけ＝巻き添えは0本だった。
+EN_LANG_WORDS = re.compile(r'\b(?:hindi|urdu|tamil|telugu|bangla|bengali|tagalog|espa[nñ]ol|portugu[eê]s|'
+                           r'sub indo|vietsub)\b', re.I)
+
+# ── 英語版の「新着だけ」の追い検索（2026-10-09 追加。仕組みと理由は上の FRESH の注記と同じ） ──────────
+# 🚨 英語版も同じ病気だった。2026-10-09 朝の候補（直近31日・再生数順の上位50本）を絞り込んだ後の実測:
+#      Anime 31本（公開3日以内0本・7日以内2本・中央値24日）／ Travel 40本（1本・7本・19日）／
+#      Food 29本（2本・7本・16日）／ Cute 11本（1本・4本・15日）
+#    10/8→10/9 の新顔は Anime 2・Travel 3・Food 2・Cute 1本、Anime のベスト3は公開27日前だった。
+# 実測（US・en・直近7日。視聴可・横長・上の決まりを全部掛けて2,000回以上で残った本数／うち朝の候補に無かった本数）:
+#    anime official trailer(any) 26/26 ・ japan travel vlog 25/20 ・ japan food 18/16
+#    3日の窓は弱かった: japan travel vlog 3日=4本（3日では2,000回に届かない）／ japan food 3日=16本だが
+#    「日本の台所の習慣7つ」型の量産動画が4本 ／ anime official trailer 3日=23本だが末尾がファン作の偽予告。
+# 不採用（上位20本の題名を読んで決めた。本数だけなら足りる語もある）:
+#    anime amv edit 7日=4本（元の語は短い窓で死ぬ。うち2本は編集チュートリアル）
+#    amv 7日=29本だが上位20本中 スペイン語9・ロシア語1・ベトナム語1・ドイツ語の戦車ゲーム1・チュートリアル2
+#    anime amv(any) 7日=3本（50本中47本が縦のショート）
+#    anime trailer(any) 7日=ゲーム・ディズニー・海外アニメの予告が混ざる
+#    crunchyroll(any) 7日=34本だが同じ予告の各国版（スペイン語・ポルトガル語・インド）で埋まる
+#    japan travel 7日=紙工作ASMR・「2026年の未来技術」型が混ざる
+#    japan vlog 7日=インドのアニメ祭・タガログ語・暮らしの日記が上位
+#    japan food tour 7日=5本 ／ japanese street food 7日=7本 ／ japan street food 7日=6本 ／
+#    japan ramen 7日=10本（うち食の動画5本）／ tokyo food 7日=29本だが上位20本中12本が暮らしの日記・家計の話
+#    japanese cat 7日=5本 ／ cats in japan 7日=3本 ／ shiba inu 7日=6本が全部暗号資産 ／
+#    japan cat|kitten|dog|puppy|shiba 7日=6本（猫の動画は1本）
+# 🐱 Cute には新着の検索を入れていない。英語の題名で・日本の・猫や犬の・2,000回以上の動画は7日で3本前後しか無く
+#    （31日でも11本）、検索を足しても棚は動かない。題名に日本語を含む動画を外す決まり（2026-09-03 内田さん決裁）と
+#    2,000回の下限を守る限り、語を替えても同じ。検索語でなく棚の決め方の問題なので、ここでは変えていない。
+# 検索は1日+3回（EN 計7回）。新着が取れなかった日は元の候補だけで棚を作る（fresh_ids は例外を上げない）。
+FRESH_EN = {
+    'anime':  [('anime official trailer', 'any', 7)],
+    'travel': [('japan travel vlog', 'medium', 7)],
+    'food':   [('japan food', 'medium', 7)],
+}
+# 公式の予告は再生数の桁が違う（実測の1位は273万回。ファンのAMVは数千〜数万回）ので、制限しないと棚の大半が
+# 予告になる。棚の説明は「公式の予告と、ファンのAMV」なので半分ずつ（JP版アニメの FRESH_MAX と同じ理由・同じ本数）。
+FRESH_MAX_EN = {'anime': 10}
+
+
+def on_topic_en(key, v):
+    """英語版の検索候補がその棚の話題に合うか。決まりは TOPIC_KEYWORDS_EN / TOPIC_REQUIRE_EN / TOPIC_EXCLUDE_EN。
+    どれも載っていない棚（Cute）は全部通す。"""
+    text = (v.get('title', '') + ' ' + v.get('channelTitle', '')).lower()
+    kw = TOPIC_KEYWORDS_EN.get(key)
+    if kw and not any(w in text for w in kw):
+        return False
+    rx = TOPIC_REQUIRE_EN.get(key)
+    if rx and not rx.search(text):
+        return False
+    ng = TOPIC_EXCLUDE_EN.get(key)
+    if ng and any(w in v.get('title', '').lower() for w in ng):
+        return False
+    return True
 PINNED_EN = {
     'ucchii': {
         'videoId': 'cWzRARpo7nQ',
@@ -353,7 +437,7 @@ def configure_edition(edition):
     """
     global EDITION, REGION, LANG, DATA, HIST, HOF, INDEX, POOL, BLOCK, SITE_URL
     global THEMES, CATEGORY, HOT_KEYS, PINNED, OWN_LABEL, OWN_NOTE, SHORT_LABEL
-    global TEMPLATE_FILE, SITEMAP, FRESH
+    global TEMPLATE_FILE, SITEMAP, FRESH, FRESH_MAX
     if edition != 'en':
         EDITION = 'jp'
         return
@@ -376,7 +460,10 @@ def configure_edition(edition):
     THEMES = THEMES_EN
     CATEGORY = {}                               # EN版はカテゴリ急上昇を使わない（実測で横長0本のため）
     HOT_KEYS = set()                            # EN版に旬タブの区別は無い（全タブ NORMAL_TIERS）
-    FRESH = {}                                  # 新着の追い検索はJP版だけ（棚キー anime がJP版と同名なので必ず空にする）
+    # 新着の追い検索は英語版用の語に差し替える（2026-10-09）。棚キー anime がJP版と同名なので、
+    # JP版の FRESH / FRESH_MAX をそのまま使うと日本語の語で検索してしまう。必ず両方とも置き換える。
+    FRESH = FRESH_EN
+    FRESH_MAX = FRESH_MAX_EN
     PINNED = PINNED_EN
     OWN_LABEL = OWN_LABEL_EN
     OWN_NOTE = OWN_NOTE_EN
@@ -539,6 +626,11 @@ def hydrate(ids, drop_vertical=True):
                 'landscape': land,             # True=横長 / False=縦 / None=判定不能
                 'thumb': (th.get('medium') or th.get('high') or th.get('default') or {}).get('url', ''),
             })
+            if EDITION == 'en':
+                # 英語版だけ、言語の申告を持たせる（filter_lang が読む。理由は EN_LANG_OK の注記）。
+                # 日本語版の台帳(data.json)には1文字も足さない。
+                out[-1]['alang'] = sn.get('defaultAudioLanguage') or ''
+                out[-1]['tlang'] = sn.get('defaultLanguage') or ''
     if dropped:
         # 握り潰さず必ず出す（最上位ルール(-0.4)「判定より先に数を出す」と同じ思想）
         print('   └ 除外 %d件: %s' % (len(dropped), ', '.join(sorted(set(dropped)))))
@@ -720,7 +812,25 @@ def filter_lang(vids):
                       if re.search(r'[぀-ヿ㐀-鿿가-힣]', v.get('title', '')))
         if cjk_ids:
             print('   └ drop %d CJK-titled videos (off-brand for an English tab)' % len(cjk_ids))
-        return [v for v in vids if v['videoId'] not in cjk_ids]
+        vids = [v for v in vids if v['videoId'] not in cjk_ids]
+
+        # 🆕 2026-10-09: 他の言語と申告されている動画を外す（理由と実測は EN_LANG_OK の注記）。申告が無ければ残す。
+        def _other(code):
+            return bool(code) and code.split('-')[0].lower() not in EN_LANG_OK
+
+        def _why(v):
+            for code in (v.get('alang'), v.get('tlang')):
+                if _other(code):
+                    return code.split('-')[0].lower()
+            return 'named in title' if EN_LANG_WORDS.search(v.get('title', '')) else None
+
+        far = [v for v in vids if _why(v)]
+        if far:
+            _codes = sorted(set(_why(v) for v in far))
+            print('   └ drop %d videos in another language (%s)' % (len(far), ', '.join(_codes)))
+            _far = set(v['videoId'] for v in far)
+            vids = [v for v in vids if v['videoId'] not in _far]
+        return vids
     _jp = [v for v in vids if re.search(r'[ぁ-んァ-ヶー]', v.get('title', ''))]
     if len(vids) - len(_jp):
         print('   └ かなの無いタイトル%d本を外す（外国語の動画）' % (len(vids) - len(_jp)))
@@ -1644,7 +1754,8 @@ def render_en(d):
                 if _known else '<p class="sub3"><span class="upd">Updated ' + _ut + '</span></p>')
     out = (tpl.replace('__BODY__', body).replace('__UPD__', d['updated']).replace('__NEWTOTAL__', newtotal)
               .replace('__T_NORM__', str(NORMAL_TIERS[0])).replace('__C_NORM__', str(NORMAL_TIERS[-1]))
-              .replace('__STREAK__', str(TOP3_MAX_STREAK)).replace('__FILL__', str(FILL_DAYS)))
+              .replace('__STREAK__', str(TOP3_MAX_STREAK)).replace('__FILL__', str(FILL_DAYS))
+              .replace('__SHELF__', str(SHELF_MAX_DAYS)))
     with open(INDEX + '.tmp', 'w', encoding='utf-8') as f:
         f.write(out)
         f.flush()
@@ -1973,6 +2084,8 @@ def main_en():
     JP版 main() と同じ低レベル部品（theme_videos/rank_today/topup/hydrate/trending/own_songs/
     cap_channel/dedupe_titles/demote_used/streak連続居座り防止/pool.json再利用/縦動画除外/
     部分失敗ガード）をそのまま再利用しつつ、ジョブ構成だけ6タブ・殿堂入り無しに変える。
+    2026-10-09: 新着の追い検索(FRESH_EN)・棚に出た通算日数(shelf_days)・入れ替わりの少ない日数(quiet_days)も
+    JP版と同じ部品で入れた（それまで英語版は4位以下に鮮度の決まりが無く、新顔は1日2〜3本だった）。
     JP版 main() 自体は一切変更しない（このファイル内の別関数）。
     """
     if not API_KEY:
@@ -2002,6 +2115,10 @@ def main_en():
             prev_streak[(_k, _v['videoId'])] = int(_v.get('streak') or 1)
     same_day = bool(prev_updated) and prev_updated[:10] == now_jst[:10]
     streak_step = 0 if same_day else 1
+    # 🆕 2026-10-09 棚に出た通算日数（棚キー → {動画ID: 日数}）。JP版 main() と同じ仕組みで、上限
+    #    (SHELF_MAX_DAYS・英語版に旬タブは無いので全タブ同じ)に達した動画を4位以下の後ろへ回す。
+    #    shelf_days を持たない古い台帳は空＝全動画0日から数え始める。
+    prev_shelf = dict((_k, dict(_t.get('shelf_days') or {})) for _k, _t in prev_themes.items())
 
     # 'jptrend' = 「Trending in Japan」。JP版の総合と同じ情報源(mostPopular region=JP)を
     # region引数だけ変えて直接取る＝検索を使わず1u。翻訳しない方針なのでタイトルはそのまま。
@@ -2011,7 +2128,7 @@ def main_en():
            list(THEMES) + [(OWN_KEY, OWN_LABEL, None, None, OWN_NOTE)]
 
     for key, label, q, dur, note in jobs:
-        pool, how = [], ''
+        pool, how, alive = [], '', set()
         try:
             if key == 'jptrend':
                 pool = trending(region='JP')
@@ -2023,18 +2140,21 @@ def main_en():
                 # EN版は全タブ NORMAL_TIERS(7/14/30日)・FILL_DAYS(31日)固定。旬/通常の区別は無い。
                 block = set(vid for (k2, vid), s in prev_streak.items()
                             if k2 == key and s >= TOP3_MAX_STREAK) | set(_used_ids)
+                # 棚に出ずっぱりの動画（通算の上限に達したもの）。ベスト3には選ばず、4位以下の後ろへ回す
+                # （消さない。代わりが足りない日は残る）。
+                tired = set(vid for vid, n in prev_shelf.get(key, {}).items() if n >= SHELF_MAX_DAYS)
                 pool = theme_videos(q, dur, window=FILL_DAYS, key=key)
-                _kw = TOPIC_KEYWORDS_EN.get(key)
-                if _kw:
-                    _before = len(pool)
-                    pool = [v for v in pool if any(
-                        w in (v['title'] + ' ' + v['channelTitle']).lower() for w in _kw)]
-                    if _before - len(pool):
-                        print('   └ drop %d off-topic (no Japan keyword): %d -> %d'
-                              % (_before - len(pool), _before, len(pool)))
-                vids = rank_today(pool, hist, set(), tiers=NORMAL_TIERS, block=block)
+                _before = len(pool)
+                pool = [v for v in pool if on_topic_en(key, v)]
+                if _before - len(pool):
+                    print('   └ drop %d off-topic (topic rules for this shelf): %d -> %d'
+                          % (_before - len(pool), _before, len(pool)))
+                _lim = (_fresh_only.get(key, set()), FRESH_MAX[key]) if key in FRESH_MAX else None
+                vids = rank_today(pool, hist, set(), tiers=NORMAL_TIERS, block=block | tired, tired=tired,
+                                  limit=_lim)
                 if pool:
-                    vids = topup(vids, pool, set(), max_age=FILL_DAYS)
+                    vids = topup(vids, pool, set(), max_age=FILL_DAYS, tired=tired)
+                alive = set(v['videoId'] for v in pool)
                 _ok = [v for v in vids if v.get('views', 0) >= FILL_MIN_VIEWS]
                 if len(_ok) >= 10 and len(_ok) < len(vids):
                     print('   └ drop %d videos under %d views (%d -> %d)'
@@ -2043,8 +2163,11 @@ def main_en():
                 vids = demote_used(vids, keep_head=3)
                 for v in vids:
                     _used_ids.add(v['videoId'])
-                how = ('source: search, last %d days / order: %s / top3 within %d days'
-                       % (FILL_DAYS, _mode_en(_last_mode), _last_top_age))
+                _src = 'search, last %d days' % FILL_DAYS
+                if FRESH.get(key):
+                    _src += ' + new uploads from the last %d days' % min(s[2] for s in FRESH[key])
+                how = ('source: %s / order: %s / top3 within %d days'
+                       % (_src, _mode_en(_last_mode), _last_top_age))
         except Exception as e:                      # 1テーマ失敗で全体を落とさない（JP版と同じ思想）
             print('NG %s: %s' % (label, str(e)[:160]))
             vids = None
@@ -2085,6 +2208,15 @@ def main_en():
             newhist[v['videoId']] = v['views']
         theme = {'key': key, 'label': label, 'note': note, 'videos': vids,
                  'asof': data['updated'], 'stale': False, 'how': how, 'carried_days': 0}
+        # 🆕 2026-10-09 棚に出た通算日数を更新する（JP版と同じ）。候補から消えた動画は忘れる。
+        #    同じ日の作り直しでは増やさない。今日はじめて出た動画は1日目。
+        if key not in ('jptrend', OWN_KEY):
+            _sp = prev_shelf.get(key, {})
+            _on = set(v['videoId'] for v in vids)
+            _sd = dict((vid, n) for vid, n in _sp.items() if vid in alive or vid in _on)
+            for vid in _on:
+                _sd[vid] = max(1, int(_sp.get(vid, 0)) + streak_step)
+            theme['shelf_days'] = _sd
         if key != OWN_KEY:
             _pt = prev_themes.get(key) or {}
             if same_day:
@@ -2096,6 +2228,14 @@ def main_en():
             if base is not None:
                 theme['yesterday_ids'] = sorted(base)
                 theme['new_count'] = sum(1 for v in vids if v.get('new'))
+                # 入れ替わりが少ない日が何日続いているか（JP版と同じ・理由は QUIET_NEW の注記）。
+                # 新顔が QUIET_NEW 本を超えた日に0へ戻す。同じ日の作り直しでは増やさない。監視が日数で読む。
+                _quiet = int(_pt.get('quiet_days') or 0)
+                if theme['new_count'] > QUIET_NEW:
+                    _quiet = 0
+                elif not same_day:
+                    _quiet += 1
+                theme['quiet_days'] = _quiet
         if key in PINNED:
             try:
                 got = hydrate([PINNED[key]['videoId']], drop_vertical=False)
@@ -2108,6 +2248,13 @@ def main_en():
                 print('   └ NG pinned: %s' % str(e)[:80])
         data['themes'].append(theme)
         print('OK %s (%d)' % (label, len(vids)))
+
+    # 棚ごとの新顔の本数を必ず1行で出す（JP版と同じ）。閾値内の日も省略しない＝少ない日が続いても
+    # ログから消えない（CLAUDE.md 最上位ルール(-0.4)）。
+    print('NEW(en) newcomers per shelf: ' + ' / '.join(
+        '%s %s/%d%s' % (t['label'], t.get('new_count', '—'), len(t['videos']),
+                        (' (quiet day %d)' % t['quiet_days']) if t.get('quiet_days') else '')
+        for t in data['themes'] if t['key'] != OWN_KEY))
 
     expected = len(jobs) - len(pending)
     if pending:
