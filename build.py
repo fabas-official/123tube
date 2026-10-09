@@ -247,7 +247,7 @@ THEMES = [
 #            猫 7日（50本取れるが、棚に並べたら20本中7本が猫の動画でなかった: 猫ミームの歴史語り・
 #            VRゲーム・歌ってみた・ニュース。保護猫 は上位22本が全部猫の動画だった）
 # THEMES 側の語は変えていない（殿堂入りの検索にも使っているので、そちらを巻き込まないため）。
-# 検索は1日+7回（1回100ユニット）。1ビルドは JP 18回＋殿堂入り＋EN 7回（うち新着3回・FRESH_EN）で、9/2 に 62回/日 を投げて
+# 検索は1日+7回（1回100ユニット）。1ビルドは JP 18回＋殿堂入り＋EN 8回（うち新着4回・FRESH_EN）で、9/2 に 62回/日 を投げて
 # 429 が出なかった範囲に収まる。新着が取れなかった日は元の候補だけで棚を作る（棚は落とさない）。
 FRESH = {
     'kane':     [('投資', 'medium', 3), ('節約 貯金', 'medium', 7)],
@@ -319,8 +319,10 @@ THEMES_EN = [
      'Real trips, real reactions — what it actually looks like to travel Japan right now.'),
     ('food', 'Food', ['japan food tour'], 'medium',
      'Ramen, street food, and everything worth queueing for.'),
+    # 2026-10-09: 題名が日本語の動画も並ぶようになったので、説明文にそのことを書いた（EN_CJK_TITLE_OK の注記）。
     ('cute', 'Cute', ['japanese cat'], 'medium',
-     'Cats (and the occasional very good dog). No commentary needed.'),
+     'Cats (and the occasional very good dog), mostly from Japanese homes and rescues. '
+     'Many titles are in Japanese — no translation needed.'),
 ]
 # 除外リストはJP版と同じ完全一致方式で en/blocklist.json を別に育てる（2026-09-03 種を投入）。
 # 「Trending in Japan」枠は trending(region='JP') を直接使うので theme_videos を通らず、
@@ -348,9 +350,17 @@ TOPIC_REQUIRE_EN = {'food': re.compile(
     r'\b(?:food|foodie|ramen|sushi|sashimi|udon|soba|noodle|curry|izakaya|wagyu|bento|yakiniku|yakitori|tempura|'
     r'tonkatsu|katsu|gyoza|takoyaki|okonomiyaki|onigiri|donburi|omurice|matcha|mochi|eat|ate|restaurant|chef|cook|'
     r'kitchen|meal|dish|feast|buffet|bakery|dessert|sweet|snack|sandwich|burger|pizza|konbini|convenience store|'
-    r'breakfast|lunch|dinner|cafe|market|delicious|tasty|taste|chicken|beef|pork|seafood|crab)(?:s|es|ing|ed)?\b')}
+    r'breakfast|lunch|dinner|cafe|market|delicious|tasty|taste|chicken|beef|pork|seafood|crab)(?:s|es|ing|ed)?\b'),
+    # Cute は猫・犬の語が題名かチャンネル名にあること（2026-10-09）。japanese cat の候補には
+    # 「日本のひとり暮らし」「おばあちゃんの夕食」のような動物の出ない動画が混ざる（修正リスト 2026-09-05 の A-3）。
+    # 保護猫 直近7日の候補では 48本→46本（落ちたのはヘビの動画など）。
+    'cute': re.compile(r'(?:\b(?:cat|cats|kitten|kittens|kitty|dog|dogs|puppy|puppies|shiba|akita|neko)\b|'
+                       r'猫|ねこ|ネコ|にゃん|ニャン|犬|いぬ|イヌ|わんこ|ワンコ|柴|子猫|仔猫|子犬)')}
 #   react は reaction / reacts / REACT をまとめて拾う（作り直した棚に「AMV NOOBS REACT to …」が14位で出た）。
-TOPIC_EXCLUDE_EN = {'anime': ('tutorial', 'react', 'roblox', 'fortnite')}
+#   Cute は、猫の名前が題名に入っているだけの動画を外す（作り直した棚の15〜18位に、アニメの猫キャラの声優比べ2本と
+#   ゲーム内に作った猫カフェ1本が出た。修正リスト 2026-09-05 の A-3 と同じ種類）。
+TOPIC_EXCLUDE_EN = {'anime': ('tutorial', 'react', 'roblox', 'fortnite'),
+                    'cute':  ('voice actor', 'seiyuu', 'toca boca')}
 
 # ── 英語版: 他の言語の動画を外す（2026-10-09 追加） ─────────────────────────────
 # 題名がローマ字でも中身はヒンディー語・スペイン語、という動画は題名の文字種では見分けられない
@@ -368,6 +378,16 @@ EN_LANG_OK = ('en', 'ja', 'zxx', 'und')
 # 申告なしで出た）。2026-10-09 の候補143本で当たったのはこの1本だけ＝巻き添えは0本だった。
 EN_LANG_WORDS = re.compile(r'\b(?:hindi|urdu|tamil|telugu|bangla|bengali|tagalog|espa[nñ]ol|portugu[eê]s|'
                            r'sub indo|vietsub)\b', re.I)
+
+# ── 英語版: 題名に日本語があっても外さない棚（2026-10-09 追加） ─────────────────────
+# 英語版は「Trending in Japan 以外のタブに日本語・韓国語の題名を出さない」決まり（2026-09-03 内田さん決裁）で、
+# filter_lang() が題名にかな・漢字・ハングルのある動画を外している。Cute はこの決まりのままでは棚が作れなかった:
+#   英語の題名で・日本の・猫や犬の・2,000回以上の動画は直近7日で3本前後、31日でも11本（表示11本・新顔1本/日）。
+#   一方、日本の猫・犬の動画はほとんどが日本語の題名（shiba inu 直近7日は50本中44本が日本語の題名）。
+# 2026-10-09 にPMが「Cute だけ日本語の題名の動画も出す」を勧め、内田さんの返事は「GO」（14:32）。
+# 猫の動画は題名が読めなくても伝わる（Trending in Japan を日本語のまま出しているのと同じ理由）。
+# 外すのをやめるのは Cute だけ。他の言語の申告で外す決まり（EN_LANG_OK）は Cute にもそのまま掛かる。
+EN_CJK_TITLE_OK = {'cute'}
 
 # ── 英語版の「新着だけ」の追い検索（2026-10-09 追加。仕組みと理由は上の FRESH の注記と同じ） ──────────
 # 🚨 英語版も同じ病気だった。2026-10-09 朝の候補（直近31日・再生数順の上位50本）を絞り込んだ後の実測:
@@ -390,23 +410,30 @@ EN_LANG_WORDS = re.compile(r'\b(?:hindi|urdu|tamil|telugu|bangla|bengali|tagalog
 #    japan ramen 7日=10本（うち食の動画5本）／ tokyo food 7日=29本だが上位20本中12本が暮らしの日記・家計の話
 #    japanese cat 7日=5本 ／ cats in japan 7日=3本 ／ shiba inu 7日=6本が全部暗号資産 ／
 #    japan cat|kitten|dog|puppy|shiba 7日=6本（猫の動画は1本）
-# 🐱 Cute には新着の検索を入れていない。英語の題名で・日本の・猫や犬の・2,000回以上の動画は7日で3本前後しか無く
-#    （31日でも11本）、検索を足しても棚は動かない。題名に日本語を含む動画を外す決まり（2026-09-03 内田さん決裁）と
-#    2,000回の下限を守る限り、語を替えても同じ。検索語でなく棚の決め方の問題なので、ここでは変えていない。
-# 検索は1日+3回（EN 計7回）。新着が取れなかった日は元の候補だけで棚を作る（fresh_ids は例外を上げない）。
+# 🐱 Cute は英語の語では新着が取れない（上の4語。英語の題名で・日本の・猫や犬の・2,000回以上の動画が
+#    7日で3本前後しか無い）。同日午後、題名の日本語を外さない棚にしたうえで（EN_CJK_TITLE_OK）日本語の語を測った:
+#      保護猫 7日=46本（うち題名が日本語45本・公開3日以内12本・1日あたり再生数の上位22本が全部猫の動画）→ 採用
+#      shiba inu 7日=41本（題名が日本語39本・上位22本が全部犬）だが、英語の題名の暗号資産の動画が6本混ざり、
+#      題名の語では外しきれない（「SHIBA INU WILL ROCKET UP…」）→ 不採用。犬は元の候補に出た時だけ並ぶ。
+#    保護猫 は日本語版の「かわいい」の新着と同じ語だが、地域と言語の指定が違うので結果は別に取る（+1回）。
+# 検索は1日+4回（EN 計8回）。新着が取れなかった日は元の候補だけで棚を作る（fresh_ids は例外を上げない）。
 FRESH_EN = {
     'anime':  [('anime official trailer', 'any', 7)],
     'travel': [('japan travel vlog', 'medium', 7)],
     'food':   [('japan food', 'medium', 7)],
+    'cute':   [('保護猫', 'medium', 7)],
 }
 # 公式の予告は再生数の桁が違う（実測の1位は273万回。ファンのAMVは数千〜数万回）ので、制限しないと棚の大半が
 # 予告になる。棚の説明は「公式の予告と、ファンのAMV」なので半分ずつ（JP版アニメの FRESH_MAX と同じ理由・同じ本数）。
-FRESH_MAX_EN = {'anime': 10}
+# Cute は14本まで。制限しないと20本全部が日本語の題名の新着になる（1日あたりの再生数が1桁多い）。
+# 英語の題名の日本の猫動画（NHK WORLD の「A Cat's-Eye View of Japan」など）は本数こそ少ないが英語版の看板に
+# いちばん合うので、6本ぶんの席を残す。
+FRESH_MAX_EN = {'anime': 10, 'cute': 14}
 
 
 def on_topic_en(key, v):
     """英語版の検索候補がその棚の話題に合うか。決まりは TOPIC_KEYWORDS_EN / TOPIC_REQUIRE_EN / TOPIC_EXCLUDE_EN。
-    どれも載っていない棚（Cute）は全部通す。"""
+    どれも載っていない棚は全部通す。"""
     text = (v.get('title', '') + ' ' + v.get('channelTitle', '')).lower()
     kw = TOPIC_KEYWORDS_EN.get(key)
     if kw and not any(w in text for w in kw):
@@ -796,7 +823,7 @@ def older_than_a_day(asof, now):
         return True
 
 
-def filter_lang(vids):
+def filter_lang(vids, key=None):
     """検索候補から「そのエディションの対象言語に合わないタイトル」を落とす。
 
     🇯🇵 JP版（既定）: タイトルにかなが1文字も無い動画を外国語として除外（2026-09-02）。
@@ -806,10 +833,13 @@ def filter_lang(vids):
     🇺🇸 EN版: 逆に、タイトルにCJK文字（かな・漢字・ハングル）を含む動画を除外する
        （2026-09-03 内田さん決裁「Trending in Japan」枠以外の英語タブに日本語/韓国語タイトルを出さない）。
        「Trending in Japan」枠は trending() を直接使い、この関数を通らないので対象外。
+       key が EN_CJK_TITLE_OK の棚（Cute）だけは題名の日本語を外さない（2026-10-09・理由は同定数の注記）。
+       key を見るのは英語版だけ。日本語版は key を渡されても何も変わらない。
     """
     if EDITION == 'en':
-        cjk_ids = set(v['videoId'] for v in vids
-                      if re.search(r'[぀-ヿ㐀-鿿가-힣]', v.get('title', '')))
+        cjk_ids = set() if key in EN_CJK_TITLE_OK else set(
+            v['videoId'] for v in vids
+            if re.search(r'[぀-ヿ㐀-鿿가-힣]', v.get('title', '')))
         if cjk_ids:
             print('   └ drop %d CJK-titled videos (off-brand for an English tab)' % len(cjk_ids))
         vids = [v for v in vids if v['videoId'] not in cjk_ids]
@@ -905,7 +935,7 @@ def theme_videos(queries, dur, window=None, key=None):
     # ここでは cap_channel を掛けない。プールを先に3本/chへ絞ると、
     # rank_today() が「その日の伸び」で選ぶ前に再生数順で切られてしまうため。
     vids = dedupe_titles(sorted(hydrate(ids), key=lambda x: -x['views']))
-    vids = filter_lang(vids)
+    vids = filter_lang(vids, key)
     fresh = len([v for v in vids if age_days(v) <= TODAY_MAX_AGE])
     print('   └ 直近%d日で%d本（うち%d日以内=%d本）' % (days, len(vids), TODAY_MAX_AGE, fresh))
     return vids                                # 振り分けは rank_today() と topup() が行う
