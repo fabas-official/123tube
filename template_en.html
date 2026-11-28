@@ -1,23 +1,27 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Japan Buzz — Anime, Travel &amp; Food video rankings from Japan, updated daily</title>
-<meta name="description" content="Anime edits, Japan travel vlogs, street food tours and cute animal clips — re-ranked every day from fresh YouTube data, plus Japan's own overall trending chart and original Japanese songs. No searching required.">
+<title>Japan Buzz — Anime, Japan News, J-Music, Travel &amp; Food video rankings, updated daily</title>
+<meta name="description" content="Anime, Japan news in English, J-pop and J-rock, travel vlogs, food tours and cute animal clips — re-ranked every day (news several times a day) from fresh YouTube data, plus Japan's own trending chart and original Japanese songs. No searching required.">
 <link rel="canonical" href="https://fabas-official.github.io/123tube/en/">
-<meta property="og:title" content="Japan Buzz — Anime, Travel & Food video rankings from Japan, updated daily">
-<meta property="og:description" content="Fresh anime, travel, food and cute-animal video rankings tied to Japan, updated every day.">
+<!-- 2026-11-28 hreflang: tell search engines the Japanese and English editions are the same site in two languages -->
+<link rel="alternate" hreflang="en" href="https://fabas-official.github.io/123tube/en/">
+<link rel="alternate" hreflang="ja" href="https://fabas-official.github.io/123tube/">
+<link rel="alternate" hreflang="x-default" href="https://fabas-official.github.io/123tube/en/">
+<meta property="og:title" content="Japan Buzz — Anime, Japan News, J-Music, Travel & Food rankings, updated daily">
+<meta property="og:description" content="What Japan is watching today: anime, news in English, J-Music, travel, food and cute animals — updated every day.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://fabas-official.github.io/123tube/en/">
 <meta name="twitter:card" content="summary_large_image">
-<meta property="og:image" content="https://fabas-official.github.io/123tube/og.png">
+<meta property="og:image" content="https://fabas-official.github.io/123tube/en/og.png">
 <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
-<meta name="twitter:image" content="https://fabas-official.github.io/123tube/og.png">
+<meta name="twitter:image" content="https://fabas-official.github.io/123tube/en/og.png">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"WebSite",
  "name":"Japan Buzz","alternateName":"Japan Buzz by 123Tube",
  "url":"https://fabas-official.github.io/123tube/en/",
- "description":"Daily-refreshed rankings of anime, travel, food and cute-animal videos connected to Japan, plus Japan's own trending chart.",
+ "description":"Daily-refreshed rankings of anime, Japan news, J-Music, travel, food and cute-animal videos connected to Japan, plus Japan's own trending chart.",
  "inLanguage":"en"}
 </script>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🌏</text></svg>">
@@ -80,14 +84,17 @@ header{padding:30px 20px 18px;text-align:center}
       background:var(--ac-fill);border-radius:999px;padding:0 4px;margin:3px auto 0;line-height:1.6;
       letter-spacing:.06em;max-width:40px}
 
-/* ── nav: flat 3x2 grid, fixed (avoids the JP site's lesson: never leave a lopsided last row) ──
+/* ── nav: flat 4x2 grid, fixed (avoids the JP site's lesson: never leave a lopsided last row) ──
    Anime is first (the star genre, opens by default). Ucchii-P's Songs is always last +
    accented purple, so it never gets lost even without a dedicated mega-slot. */
-.tabs{display:grid;gap:10px;grid-template-columns:repeat(3,minmax(0,1fr));margin:10px 0 26px;padding:2px}
+.tabs{display:grid;gap:10px;grid-template-columns:repeat(4,minmax(0,1fr));margin:10px 0 26px;padding:2px}
+/* 8 tabs = 4 columns x 2 rows (2026-11-28). On narrow phones the labels (Trending in Japan / Ucchii-P's Songs) would
+   not fit in a quarter of the width, so below 600px it becomes 2 columns x 4 rows instead of squeezing the text. */
+@media(max-width:599px){.tabs{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .tab{padding:16px 8px;border:2px solid var(--line);border-radius:16px;cursor:pointer;text-align:center;
      background:var(--card);color:var(--tx);font-size:14px;font-weight:800;font-family:inherit;
      letter-spacing:-.01em;box-shadow:var(--sh);transition:.14s}
-@media(min-width:520px){.tab{font-size:15.5px;padding:18px 10px}}
+@media(min-width:520px){.tab{font-size:15px;padding:18px 8px}}
 .tab:hover{border-color:var(--ac);color:var(--ac);background:var(--ac-s)}
 .tab.on{background:var(--ac-fill);border-color:var(--ac-fill);color:var(--on-ac);box-shadow:var(--sh2)}
 .tab[data-t="anime"]:not(.on){border-color:var(--ac);color:var(--ac)}
@@ -188,16 +195,19 @@ footer a{color:var(--ac);font-weight:700}
 <header>
   <a class="jplink" href="https://fabas-official.github.io/123tube/">🇯🇵 日本語版はこちら (Japanese edition)</a>
   <p class="logo">Japan<span>Buzz</span></p>
-  <h1 class="tag">Anime, travel, food &amp; cute — Japan-themed video buzz, ranked fresh every day</h1>
-  <p class="sub2">Six shelves, no searching required. <b class="kr">Anime leads</b> — the genre that already
-  travels furthest outside Japan — plus real trips, real food, real cats, Japan's own trending chart
-  (titles left in Japanese on purpose), and our own original songs.</p>
+  <h1 class="tag">Anime, news, music, travel, food &amp; cute — Japan-themed video buzz, ranked fresh every day</h1>
+  <p class="sub2">Eight shelves, no searching required. <b class="kr">Anime leads</b> — the genre that already
+  travels furthest outside Japan — plus Japan's news in English, what Japan is listening to, real trips, real food,
+  real cats, Japan's own trending chart (J-Music and Trending keep their Japanese titles on purpose), and our own
+  original songs.</p>
   __NEWTOTAL__
 </header>
 <main>__BODY__</main>
 <footer>
   <p>Last updated: __UPD__ JST ／ Sources: YouTube Data API v3, worldwide English-language search
-  (Anime / Travel / Food), cat videos from Japan including Japanese-titled ones (Cute), plus Japan's own
+  (Anime / Travel / Food) with new uploads from official and trusted channels placed first, uploads from
+  English-language newsrooms in Japan (Japan News — refreshed several times a day, see “News updated” at the top),
+  Japan's music trending chart (J-Music), cat videos from Japan including Japanese-titled ones (Cute), plus Japan's own
   trending chart (Trending in Japan).<br>
   <b>Today's Top 3</b> = the videos with the strongest 1-day growth in each genre, from a pool of videos
   published in roughly the last __FILL__ days. A video can stay in the Top 3 for at most __STREAK__ days in a

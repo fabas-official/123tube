@@ -1,0 +1,175 @@
+{
+ "_note": "チャンネルの新着から作る棚の設定。コードを触らずにチャンネルを足せる（id は UC… の24文字・channels.list で照合済みのものだけ）。2026-11-28 PM設計。",
+ "news": {
+  "how_source": "テレビ局・新聞社・通信社の公式チャンネル",
+  "top3_hours": 24,
+  "max_hours": 36,
+  "fill_hours": 60,
+  "min_views": 3000,
+  "per_channel": 4,
+  "pages": 2,
+  "tail_category": "25",
+  "tail_hours": 48,
+  "ng_title": [],
+  "channels": [
+   {
+    "id": "UCGCZAYq5Xxojl_tSXcVJhiQ",
+    "name": "ANNnewsCH"
+   },
+   {
+    "id": "UC6AG81pAkf6Lbi_1VC5NmPA",
+    "name": "TBS NEWS DIG Powered by JNN"
+   },
+   {
+    "id": "UCuTAXTexrhetbOe3zgskJBQ",
+    "name": "日テレNEWS"
+   },
+   {
+    "id": "UCoQBJMzcwmXrRSHBFAlTsIw",
+    "name": "FNNプライムオンライン"
+   },
+   {
+    "id": "UCkKVQ_GNjd8FbAuT6xDcWgg",
+    "name": "テレ東BIZ"
+   },
+   {
+    "id": "UCip8ve30-AoX2y2OtAAmqFA",
+    "name": "NHK"
+   },
+   {
+    "id": "UCk5a240pQsTVT9CWPnTyIJw",
+    "name": "ABEMAニュース【公式】"
+   },
+   {
+    "id": "UCv7_krlrre3GQi79d4guxHQ",
+    "name": "読売テレビニュース"
+   },
+   {
+    "id": "UCkKJhKO73xF1pK5h9R82ZGQ",
+    "name": "MBS NEWS"
+   },
+   {
+    "id": "UCxiRdfyH0FtFCRZTRfRsdsA",
+    "name": "中京テレビNEWS"
+   },
+   {
+    "id": "UCSWOnDD1KIriGmyQ7SgNA4A",
+    "name": "HTB北海道ニュース"
+   },
+   {
+    "id": "UCMKvT0YVLufHMdGLH89J1oA",
+    "name": "朝日新聞"
+   },
+   {
+    "id": "UCI4mta4pWhYhPSLhjmUAfZQ",
+    "name": "毎日新聞"
+   },
+   {
+    "id": "UCNLxBzguoGLqXWA8_BtHSHA",
+    "name": "時事通信映像センター"
+   },
+   {
+    "id": "UCwJXtk_1CKlCrh7YJDP2uPw",
+    "name": "共同通信 KYODO NEWS"
+   },
+   {
+    "id": "UC1zYGo1jIIjMVDTLL3dydow",
+    "name": "産経ニュース"
+   },
+   {
+    "id": "UCQhaZjODkIjuv38d-i5TVRw",
+    "name": "カンテレNEWS"
+   }
+  ]
+ },
+ "geinou": {
+  "how_source": "芸能ニュースの公式チャンネル",
+  "top3_hours": 48,
+  "max_hours": 96,
+  "fill_hours": 168,
+  "min_views": 3000,
+  "per_channel": 3,
+  "pages": 2,
+  "merge_categories": [
+   "24"
+  ],
+  "ng_title": [
+   "緊急事態",
+   "緊急搬送",
+   "騒然",
+   "激震",
+   "命乞い",
+   "末路",
+   "絶句",
+   "見放され",
+   "前代未聞",
+   "暴行を受け",
+   "極秘",
+   "ルーツを持つとされる",
+   "ざまぁ",
+   "ざまあ",
+   "ｗｗｗ",
+   "号泣",
+   "なでしこ",
+   "日本代表",
+   "プロ野球",
+   "Jリーグ",
+   "ボクシング",
+   "BOXING",
+   "サッカー",
+   "大相撲",
+   "ラグビー",
+   "ゴルフ",
+   "ワールドカップ",
+   "W杯",
+   "オリンピック",
+   "五輪"
+  ],
+  "channels": [
+   {
+    "id": "UCbZvkG2uAgr6Oiva4FytscQ",
+    "name": "ORICON NEWS"
+   },
+   {
+    "id": "UC1Vo3GM-NOGFVwsidmkYVwg",
+    "name": "モデルプレス"
+   },
+   {
+    "id": "UCDE_gujqIP9wEBZy0lVH_8Q",
+    "name": "MANTAN TV"
+   },
+   {
+    "id": "UC3gp1pr5NYX87DU7nPjlmpA",
+    "name": "めざましmedia"
+   },
+   {
+    "id": "UCRxDTCmIjgli-Xgh2KPE9dA",
+    "name": "シネマトゥデイ"
+   },
+   {
+    "id": "UCCDmd01WsuFBF8n3yMjHQ1A",
+    "name": "スポニチチャンネル"
+   },
+   {
+    "id": "UC2Wss-yUn0b5xTTZ45tQWfA",
+    "name": "ナタリー"
+   },
+   {
+    "id": "UCmm95wqa5BDKdpiXHUL1W6Q",
+    "name": "THE FIRST TIMES"
+   },
+   {
+    "id": "UC5_2fynXBhMjL3IFcierQbQ",
+    "name": "日テレNEWSカルチャー"
+   },
+   {
+    "id": "UCGMRl1NLHeMNOM4RJ34ae_A",
+    "name": "JIJIPRESS 時事通信芸能"
+   },
+   {
+    "id": "UC7_mFzmj89tqAqgpl5695QQ",
+    "name": "フジテレビ公式"
+   }
+  ]
+ }
+}

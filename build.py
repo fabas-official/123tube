@@ -105,11 +105,9 @@ FILL_MIN_VIEWS = 2000   # これ未満は「おすすめ」として並べるに
 # 再生数・前日比は毎回 videos.list(1u) で取り直すので鮮度は落ちない。
 # ＝ 夜に手作業でビルドしても翌朝の自動ビルドが検索枠を食い潰さない。
 POOL_TTL_H = 12
-# 同じ日に何度も走っても API を食わないための最小間隔。GitHub の cron は数時間遅れることがあるので
-# daily.yml に予備の時刻を複数置いてあり（03:17/05:43/07:29 JST）、直前のビルドがこの時間以内なら後続は何もしない。
-# 6h にしてあるのは、本命03:17が定刻に走った日に07:29(4.2h後)がもう一度走って「前日比」が4時間分の
-# 数字になるのを防ぐため＝**朝は必ず1回だけ**。手動実行(workflow_dispatch)は環境変数 FORCE=1 で必ず走る。
-MIN_INTERVAL_H = 6
+# 🚨 2026-11-28: 旧 MIN_INTERVAL_H（前回から6時間以内なら何もしない）は廃止。GitHub の cron が6〜7.5時間遅れるため、
+#    遅れた1回が当日の唯一の更新になり、朝に開くと昨日の棚だった。今は plan_run()（日付と時刻で
+#    フル/ニュースだけ/何もしない を決める）が担う。手動実行(workflow_dispatch)は環境変数 FORCE=1 で必ずフルビルド。
 POOL = os.path.join(HERE, 'pool.json')
 _last_window = ''       # 直近の theme_videos が実際に使った期間（タブの説明に出す）
 _last_mode = ''         # 直近の rank_today が実際に使った並べ方（同上）       # 90日で足りないジャンルを救う2段目。歴代へ飛ぶ前にここを挟む
@@ -201,10 +199,12 @@ THEMES = [
     # 🚨 2026-09-02 実測: エンタメ系カテゴリ急上昇(24+23+1)の150本は **横長の動画が0本**（全部縦のショート）。
     #    旧検索語「話題 芸能 エンタメ」も14日で数本しか無く、タブが11本止まり＆31日前の訃報が毎日末尾に残っていた。
     #    「芸能界」は14日で49本(横長)・3日以内10本。「アイドル」は14日で47本(全部2,000回超・41ch)。
+    # 🆕 2026-11-28 エンタメ・ニュースは sources.json の公式チャンネルの新着から作る（検索語は殿堂入りの検索にだけ使う。
+    #    消さないのは hof_videos() がこの語で歴代を取るため）。説明文は実態に合わせてある。
     ('geinou',   'エンタメ',   ['芸能界', 'アイドル'],                               'medium',
-     '芸能・アイドル・歌手・バラエティまで、いま話題になっているものをまとめて。'),
+     '芸能・音楽・映画・ドラマの公式ニュースチャンネルから、ここ数日いちばん見られている話題。'),
     ('news',     'ニュース',   ['ニュース 解説 わかりやすい'],                        'medium',
-     'いま話題になっていることを、解説つきで。毎日いちばん入れ替わります。'),
+     'テレビ局・新聞社・通信社の公式チャンネルから、いま（この24時間ほど）いちばん見られているニュース。'),
     ('ongaku',   '音楽',       ['MV 新曲 音楽'],                                      'medium',
      'MV・歌ってみた・弾いてみた。耳がよろこぶ棚です。'),
     ('game',     'ゲーム',     ['ゲーム実況 神プレー'],                               'medium',
@@ -315,6 +315,13 @@ THEMES_EN = [
     ('anime', 'Anime', ['anime amv edit'], 'medium',
      "Official trailers for what's airing next, plus the fan edits and AMVs buzzing right now — the clip "
      "culture that made anime travel outside Japan in the first place. No full-episode reposts."),
+    # 🆕 2026-11-28 ニュースと音楽の棚を新設（検索語は無い。ニュースは en/sources.json の英語ニュース局の新着・
+    #    音楽は日本の音楽カテゴリの急上昇）。Anime が先頭・既定タブのまま、その次に置く。
+    ('jpnews', 'Japan News', None, None,
+     "Japan's news in English, straight from NHK WORLD-JAPAN, Nippon TV, The Japan Times and other newsrooms — "
+     "the most-watched uploads of the last day or two."),
+    ('jmusic', 'J-Music', None, None,
+     "What Japan is listening to right now. Official MVs, in YouTube's own trending order."),
     ('travel', 'Travel', ['japan travel vlog'], 'medium',
      'Real trips, real reactions — what it actually looks like to travel Japan right now.'),
     ('food', 'Food', ['japan food tour'], 'medium',
@@ -359,8 +366,22 @@ TOPIC_REQUIRE_EN = {'food': re.compile(
 #   react は reaction / reacts / REACT をまとめて拾う（作り直した棚に「AMV NOOBS REACT to …」が14位で出た）。
 #   Cute は、猫の名前が題名に入っているだけの動画を外す（作り直した棚の15〜18位に、アニメの猫キャラの声優比べ2本と
 #   ゲーム内に作った猫カフェ1本が出た。修正リスト 2026-09-05 の A-3 と同じ種類）。
-TOPIC_EXCLUDE_EN = {'anime': ('tutorial', 'react', 'roblox', 'fortnite'),
+# 🆕 2026-11-28 Anime: ファン作・ゲーム・中国アニメ・TikTok・編集チュートリアルを題名で外す語を足した（公開中の Anime に
+#    ファンメイド・Robloxのゲーム予告・中国アニメ・編集チュートリアルが混ざっていた）。
+#    Travel: 他の言語の印（#india / hindi / tamil / telugu / pinoy / ofw など）。公開中の Travel は1位がヒンディー語のvlogだった。
+TOPIC_EXCLUDE_EN = {'anime': ('tutorial', 'react', 'roblox', 'fortnite', 'fanmade', 'fan made', 'fan-made',
+                              'gameplay', 'donghua', 'tiktok', 'tik tok', 'compilation', 'how to'),
+                    'travel': ('#india', 'hindi', 'tamil', 'telugu', 'pinoy', 'ofw', 'vlog in'),
                     'cute':  ('voice actor', 'seiyuu', 'toca boca')}
+# 🆕 2026-11-28 Travel / Food の検索候補は再生5,000回以上だけ（公開中の Travel に再生2千〜4千回の vlog が並んでいた）。
+#    信頼できる作り手の新着(en/sources.json)は別の下限（その設定の min_views）で選ぶ。
+EN_SEARCH_MIN_VIEWS = {'travel': 5000, 'food': 5000}
+# 🆕 Food は、日本以外の街が主題の動画（題名に他国の地名があり、日本の語が無い）を外す。
+FOOD_OTHER_PLACES = re.compile(r'ho chi minh|saigon|hanoi|vietnam|bangkok|thailand|seoul|korea|busan|taiwan|taipei|'
+                               r'hong kong|singapore|bali|indonesia|manila|philippines|india|mumbai|delhi|istanbul|'
+                               r'turkey|london|paris|new york|mexico|china|beijing|shanghai', re.I)
+FOOD_JAPAN_WORDS = re.compile(r'japan|japanese|tokyo|osaka|kyoto|nagoya|hokkaido|fukuoka|okinawa|nara|hiroshima|'
+                              r'sapporo|kobe|yokohama', re.I)
 
 # ── 英語版: 他の言語の動画を外す（2026-10-09 追加） ─────────────────────────────
 # 題名がローマ字でも中身はヒンディー語・スペイン語、という動画は題名の文字種では見分けられない
@@ -444,6 +465,10 @@ def on_topic_en(key, v):
     ng = TOPIC_EXCLUDE_EN.get(key)
     if ng and any(w in v.get('title', '').lower() for w in ng):
         return False
+    if key == 'food':
+        t = v.get('title', '')
+        if FOOD_OTHER_PLACES.search(t) and not FOOD_JAPAN_WORDS.search(t):
+            return False
     return True
 PINNED_EN = {
     'ucchii': {
@@ -464,7 +489,7 @@ def configure_edition(edition):
     """
     global EDITION, REGION, LANG, DATA, HIST, HOF, INDEX, POOL, BLOCK, SITE_URL
     global THEMES, CATEGORY, HOT_KEYS, PINNED, OWN_LABEL, OWN_NOTE, SHORT_LABEL
-    global TEMPLATE_FILE, SITEMAP, FRESH, FRESH_MAX
+    global TEMPLATE_FILE, SITEMAP, FRESH, FRESH_MAX, SOURCES, NEWS_KEYS, _sources
     if edition != 'en':
         EDITION = 'jp'
         return
@@ -483,6 +508,9 @@ def configure_edition(edition):
     BLOCK = os.path.join(out_dir, 'blocklist.json')
     SITEMAP = os.path.join(out_dir, 'sitemap.xml')
     SITE_URL = 'https://fabas-official.github.io/123tube/en/'
+    SOURCES = os.path.join(out_dir, 'sources.json')   # 英語版の発信元（ニュース局・アニメ公式・旅行/食の作り手）
+    _sources = None
+    NEWS_KEYS = ('jpnews',)                            # ニュースだけの更新で取り直す棚
     TEMPLATE_FILE = os.path.join(HERE, 'template_en.html')
     THEMES = THEMES_EN
     CATEGORY = {}                               # EN版はカテゴリ急上昇を使わない（実測で横長0本のため）
@@ -644,6 +672,9 @@ def hydrate(ids, drop_vertical=True):
                 'videoId': it['id'], 'title': sn.get('title', ''),
                 'channelTitle': sn.get('channelTitle', ''),
                 'publishedAt': sn.get('publishedAt', '')[:10],
+                # 🆕 2026-11-28 公開の完全な時刻(UTC・ISO8601)。publishedAt は日付だけなので「公開から3日」が
+                #    作った時点の日数に丸められてしまう。ニュースの棚は時間で並べるのでこちらを使う。
+                'pubTs': sn.get('publishedAt', ''),
                 'views': int(st['viewCount']),
                 'comments': int(st.get('commentCount', 0)),
                 'duration': parse_dur(it.get('contentDetails', {}).get('duration', '')),
@@ -653,6 +684,10 @@ def hydrate(ids, drop_vertical=True):
                 'landscape': land,             # True=横長 / False=縦 / None=判定不能
                 'thumb': (th.get('medium') or th.get('high') or th.get('default') or {}).get('url', ''),
             })
+            if sn.get('liveBroadcastContent') in ('live', 'upcoming'):
+                # 配信中・配信予定のライブ。チャンネルの新着から作る棚では載せない（再生数が育つ前の数字になる）。
+                # 普通の動画には何も足さない＝台帳(data.json)を太らせない。
+                out[-1]['live'] = sn['liveBroadcastContent']
             if EDITION == 'en':
                 # 英語版だけ、言語の申告を持たせる（filter_lang が読む。理由は EN_LANG_OK の注記）。
                 # 日本語版の台帳(data.json)には1文字も足さない。
@@ -1270,6 +1305,373 @@ def own_songs():
     return fresh[:LIST_N]
 
 
+# ---------------------------------------------------------------- チャンネルの新着から作る棚
+# 🆕 2026-11-28 新設。内田さん「自分で毎日開きたくなる」ための作り直し（PM設計）。
+# 🚨 なぜ検索・急上昇でなくチャンネルの新着か（2026-11-28 実測）:
+#    ニュース棚はYouTubeのニュース急上昇(カテゴリ25)をそのまま並べていて、20本中17本が公開3〜9日前・
+#    ベスト3が「公開から3日」だった（急上昇は「数日の勢い」で並ぶので、朝に開く人には昨日の話になる）。
+#    エンタメ棚は検索語「芸能界」の上位が「緊急搬送か!?」型の作り話動画で埋まり、15日前の動画も混ざっていた。
+#    → 信頼できる発信元（テレビ局・新聞社・通信社・芸能ニュース局）の uploads プレイリストを直接読み、
+#      「公開からの時間あたりの再生数」で並べる。search.list は1回も使わない（playlistItems=1u / videos.list=1u）。
+# 発信元は sources.json（日本版）/ en/sources.json（英語版）に置く＝コードを触らずにチャンネルを足せる。
+SOURCES = os.path.join(HERE, 'sources.json')
+_sources = None
+# ニュースだけの更新で取り直す棚（日本版 / 英語版）。configure_edition('en') で差し替える。
+NEWS_KEYS = ('news',)
+# 釣り題名の語。ニュース棚の末尾に足す急上昇(カテゴリ25)にだけ使う（局の動画には掛けない）。
+BAIT_WORDS = ('ざまぁ', 'ざまあ', 'ｗｗｗ', 'wwww', '号泣', '末路', '大誤算', '暴露', 'ブチギレ', '崩壊', '終了',
+              '朗報', '悲報', '閲覧注意', '激震', '衝撃の')
+NEWS_TIME_BASE_H = 6    # 並びの式 views/(経過時間h+6) の +6。公開直後の数十回の動画が1位にならないようにする
+
+
+def load_sources():
+    """sources.json を読む。壊れていても落とさず空で返す（その棚は従来の取得経路へ戻る）。"""
+    global _sources
+    if _sources is None:
+        _sources = read_json(SOURCES, {})
+    return _sources
+
+
+def source_cfg(key):
+    """その棚が「チャンネルの新着」で作れるなら設定を返す。channels が空・未定義の棚は None。"""
+    c = load_sources().get(key)
+    return c if isinstance(c, dict) and c.get('channels') else None
+
+
+def _utc(ts):
+    """'2026-11-28T01:23:45Z' -> UTC の aware datetime。読めなければ None。"""
+    try:
+        return datetime.datetime.strptime((ts or '')[:19], '%Y-%m-%dT%H:%M:%S').replace(tzinfo=datetime.timezone.utc)
+    except Exception:
+        return None
+
+
+def _utcnow():
+    return datetime.datetime.now(datetime.timezone.utc)
+
+
+def hours_since(v, now=None):
+    """公開からの経過時間(h)。pubTs が無い動画（古い台帳）は None＝日数のほうへ戻る。"""
+    t = _utc(v.get('pubTs'))
+    if t is None:
+        return None
+    return max(0.0, ((now or _utcnow()) - t).total_seconds() / 3600.0)
+
+
+def uploads_of(channel_id, since_hours, now, max_pages=2):
+    """チャンネルの uploads（ID の UC を UU に替えたプレイリスト）から、since_hours 以内の動画IDを返す。
+    1ページ50本で1ユニット。新しい順に並んでいるので、窓より古い動画が出たらそこで打ち切る
+    （playlistItems の contentDetails.videoPublishedAt は公開時刻＝videos.list を待たずに窓で切れる）。"""
+    if not (channel_id or '').startswith('UC'):
+        return []
+    pl = 'UU' + channel_id[2:]
+    ids, token = [], None
+    for _ in range(max_pages):
+        p = {'part': 'contentDetails', 'playlistId': pl, 'maxResults': 50}
+        if token:
+            p['pageToken'] = token
+        r = api('playlistItems', p)
+        old = False
+        for i in r.get('items', []):
+            cd = i.get('contentDetails', {})
+            t = _utc(cd.get('videoPublishedAt'))
+            if t is not None and (now - t).total_seconds() / 3600.0 > since_hours:
+                old = True
+                continue
+            if cd.get('videoId'):
+                ids.append(cd['videoId'])
+        token = r.get('nextPageToken')
+        if old or not token:
+            break
+    return ids
+
+
+def channel_pool(cfg, since_hours, now):
+    """設定の全チャンネルの新着を集めて hydrate する。1チャンネルが落ちても他で続ける
+    （全部落ちた時だけ例外＝棚ごと前日分の引き継ぎになる）。縦動画・70秒以下・配信中/予定のライブは載せない。"""
+    ids, seen, failed, per = [], set(), [], []
+    for ch in cfg['channels']:
+        try:
+            got = uploads_of(ch['id'], since_hours, now, int(cfg.get('pages', 2)))
+        except Exception as e:
+            failed.append(ch.get('name', ch['id']))
+            print('   └ チャンネル取得失敗 %s: %s' % (ch.get('name', ch['id']), str(e)[:80]))
+            continue
+        per.append('%s=%d' % (ch.get('name', ch['id'])[:10], len(got)))
+        for i in got:
+            if i not in seen:
+                seen.add(i)
+                ids.append(i)
+    if not ids and failed:
+        raise RuntimeError('全チャンネルの取得に失敗（%d件）' % len(failed))
+    vids = hydrate(ids) if ids else []
+    n0 = len(vids)
+    vids = [v for v in vids if v.get('_secs', 0) > SHORTS_MAX_SEC and not v.get('live')]
+    print('   └ チャンネル%d本（失敗%d）から新着%d本 → 70秒超・ライブ除外後%d本 [%s]'
+          % (len(cfg['channels']), len(failed), n0, len(vids), ' '.join(per)))
+    return vids
+
+
+def _ng_re(words):
+    """ng_title（正規表現の断片のリスト）を1本の正規表現にする。空なら None。"""
+    words = [w for w in (words or []) if w]
+    return re.compile('|'.join(words), re.I) if words else None
+
+
+def build_channel_shelf(cands, cfg, now, want=LIST_N, skip_top=frozenset()):
+    """チャンネルの新着の候補 -> 棚（vids, info）。
+
+    並び: 経過時間あたりの再生数 views/(経過時間h + NEWS_TIME_BASE_H) の大きい順。min_views 未満は外す。
+    同じチャンネルは per_channel 本まで。ベスト3は別チャンネルかつ top3_hours 以内から。足りなければ max_hours、
+    それでも足りなければ fill_hours まで広げる（広げた事実は info['widened'] で返し、棚の説明とログに出す）。
+    棚が want 本に満たない時は、max_hours→fill_hours へ窓を広げて数を稼ぐ。
+    skip_top は連日居座り・出ずっぱりの動画（ベスト3には選ばず、4位以下には残す）。
+    """
+    ng = _ng_re(cfg.get('ng_title'))
+    top_h = float(cfg.get('top3_hours', 24))
+    max_h = float(cfg.get('max_hours', 48))
+    fill_h = float(cfg.get('fill_hours', max_h))
+    per = int(cfg.get('per_channel', 4))
+    minv = int(cfg.get('min_views', 0))
+    ok = []
+    for v in cands:
+        h = hours_since(v, now)
+        if h is None or v.get('views', 0) < minv or v.get('live'):
+            continue
+        if ng and ng.search(v.get('title', '')):
+            continue
+        v['_h'] = h
+        v['_rate'] = v['views'] / (h + NEWS_TIME_BASE_H)
+        ok.append(v)
+    ok = dedupe_titles(sorted(ok, key=lambda x: -x['_rate']))
+
+    def within(limit):
+        return cap_channel([v for v in ok if v['_h'] <= limit], per)
+
+    win = max_h
+    lst = within(win)
+    if len(lst) < want and fill_h > win:
+        win = fill_h
+        lst = within(win)
+    top, used = [], set()
+    lim_used = top_h
+    for lim in (top_h, max_h, win):
+        for v in lst:
+            if len(top) >= 3:
+                break
+            if v['_h'] <= lim and v['videoId'] not in skip_top and v['channelTitle'] not in used:
+                top.append(v)
+                used.add(v['channelTitle'])
+        lim_used = lim
+        if len(top) >= 3:
+            break
+    if len(top) < 3:                                # 居座り・チャンネル重複を許してでも3枚は埋める
+        for v in lst:
+            if len(top) >= 3:
+                break
+            if v not in top:
+                top.append(v)
+    rest = [v for v in lst if v not in top]
+    out = (top + rest)[:want]
+    top_max = max([v['_h'] for v in out[:3]] or [0])
+    info = {'window_h': win, 'top_limit_h': lim_used, 'top_max_h': top_max,
+            'widened': lim_used > top_h or win > max_h,
+            'eligible': len(ok), 'listed': len(lst)}
+    for v in out:
+        v.pop('_rate', None)
+        v['hours'] = round(v.pop('_h'), 1)          # 台帳に残す（監視が「ベスト3の最古は何時間か」を読む）
+    for v in cands:                                  # 選ばれなかった候補に作業用の値を残さない
+        v.pop('_rate', None)
+        v.pop('_h', None)
+    return out, info
+
+
+def trending_tail(cfg, have_ids, now):
+    """棚の末尾にだけ足す、カテゴリ急上昇の動画（局の動画より前には出さない）。公開 tail_hours 以内・
+    釣り語なし・横長・70秒超だけ。YouTube の並びのまま・同じチャンネルは2本まで。取れなければ空。"""
+    cat = cfg.get('tail_category')
+    if not cat:
+        return []
+    try:
+        vids = category_videos([cat], None)
+    except Exception as e:
+        print('   └ 急上昇(カテゴリ%s)は取得できず: %s' % (cat, str(e)[:60]))
+        return []
+    bait = _ng_re(list(BAIT_WORDS) + list(cfg.get('ng_title') or []))
+    lim = float(cfg.get('tail_hours', 48))
+    out = []
+    for v in vids:
+        h = hours_since(v, now)
+        if h is None or h > lim or v['videoId'] in have_ids or v.get('live'):
+            continue
+        if bait and bait.search(v.get('title', '')):
+            continue
+        out.append(v)
+    return cap_channel(out, 2)
+
+
+def channel_shelf_route(key, skip_top=frozenset(), now=None):
+    """JP/EN 共通。sources の設定で1つの棚を作り、(vids, pool, how) を返す。例外は呼び出し側が受ける。
+    pool は newhist（履歴）に残す候補全部。how は読者向けの説明（実際に使った窓を必ず出す）。"""
+    cfg = source_cfg(key)
+    now = now or _utcnow()
+    since = max(float(cfg.get('max_hours', 48)), float(cfg.get('fill_hours', 0)))
+    cands = channel_pool(cfg, since, now)
+    merged = 0
+    for cat in cfg.get('merge_categories') or []:    # カテゴリ急上昇を候補へ混ぜる（エンタメ棚）
+        try:
+            extra = category_videos([cat], None)
+        except Exception as e:
+            print('   └ 急上昇(カテゴリ%s)は取得できず: %s' % (cat, str(e)[:60]))
+            continue
+        have = set(v['videoId'] for v in cands)
+        for v in extra:
+            if v['videoId'] not in have:
+                cands.append(v)
+                merged += 1
+    if EDITION == 'en':
+        cands = filter_lang(cands, key)
+    pool = list(cands)
+    vids, info = build_channel_shelf(cands, cfg, now, skip_top=skip_top)
+    nt = 0
+    if cfg.get('tail_category') and len(vids) < LIST_N:
+        tail = trending_tail(cfg, set(v['videoId'] for v in vids), now)[:LIST_N - len(vids)]
+        for v in tail:
+            v['hours'] = round(hours_since(v, now) or 0, 1)
+        vids = vids + tail
+        nt = len(tail)
+    n_ch = len(cfg['channels'])
+    if EDITION == 'jp':
+        how = ('選び方: %s（%dチャンネル）の新着・直近%d時間 ／ 並び: 公開からの時間あたりの再生数 ／ ベスト3は公開%d時間以内から'
+               % (cfg.get('how_source', '公式チャンネル'), n_ch, int(info['window_h']), int(round(info['top_max_h']))))
+        if info['widened']:
+            how += '（公開%d時間以内では3本そろわなかったため、広げています）' % int(cfg.get('top3_hours', 24))
+        if nt:
+            how += ' ／ 末尾%d本はYouTubeのニュース急上昇（公開%d時間以内）' % (nt, int(cfg.get('tail_hours', 48)))
+        if merged:
+            how += ' ／ YouTubeのカテゴリ急上昇も候補に混ぜています'
+    else:
+        how = ('source: %s (%d channels), uploads from the last %d hours / order: views per hour since upload / '
+               'top 3 published within %d hours'
+               % (cfg.get('how_source', 'official channels'), n_ch, int(info['window_h']), int(round(info['top_max_h']))))
+        if info['widened']:
+            how += ' (widened from %dh because fewer than 3 videos qualified)' % int(cfg.get('top3_hours', 24))
+    print('   └ 棚%s: 候補%d→条件通過%d→採用%d本・ベスト3最古%.1fh・窓%dh%s（検索0回）'
+          % (key, len(pool), info['eligible'], len(vids), info['top_max_h'], int(info['window_h']),
+             '・広げた' if info['widened'] else ''))
+    if not vids:
+        raise RuntimeError('チャンネルの新着から1本も作れず')
+    return vids, pool, how
+
+
+# 🆕 2026-11-28 英語版の既存の棚（Anime/Travel/Food）に「信頼できる作り手の新着」を先に混ぜる。
+def channel_boost(key, skip_top=frozenset(), now=None):
+    """EN の Anime/Travel/Food 用。sources の新着を伸び順に boost_max 本まで返す。取れなければ []。"""
+    cfg = source_cfg(key)
+    if not cfg:
+        return []
+    now = now or _utcnow()
+    try:
+        cands = channel_pool(cfg, float(cfg.get('max_hours', 240)), now)
+    except Exception as e:
+        print('   └ boost取得失敗 %s: %s' % (key, str(e)[:80]))
+        return []
+    cands = filter_lang(cands, key)
+    ng = TOPIC_EXCLUDE_EN.get(key)
+    if ng:                                           # 棚の除外語（fanmade / tutorial 等）は新着にも同じく掛ける
+        cands = [v for v in cands if not any(w in v.get('title', '').lower() for w in ng)]
+    c2 = dict(cfg, top3_hours=cfg.get('top3_hours', cfg.get('max_hours', 240)))   # 先頭3枚はなるべく新しいものから
+    vids, info = build_channel_shelf(cands, c2, now, want=int(cfg.get('boost_max', 10)), skip_top=skip_top)
+    print('   └ 新着boost %s: %d本（窓%dh・最古%.0fh）' % (key, len(vids), int(info['window_h']), info['top_max_h']))
+    return vids
+
+
+# ---------------------------------------------------------------- 更新の計画（フル / ニュースだけ / 何もしない）
+# 🚨 2026-11-28: GitHub の cron は数時間遅れる（指定 03:17 → 実際の発火 10:45〜13:00 JST・6〜7.5時間遅れ）。
+#    以前は「前回から6時間以内なら何もしない」だったので、遅れた1回が当日の唯一の更新になり、朝に開くと昨日の棚だった。
+#    → cron を30分おきにして、**日付と時刻**で決める。遅延が何時間あっても、04:00 JST を過ぎて最初に発火した回が
+#      その日のフルビルド＝1日1回（前日比・streak・新顔の意味を保つ）。残りの回はニュースだけを軽く取り直す。
+FULL_FROM_HOUR = 4          # この時刻(JST)以降で、今日のフルビルドがまだ無ければフルビルド
+NEWS_FROM_HOUR = 6          # ニュースだけの更新をしてよい時間帯の始まり（終わりは24時）
+NEWS_GAP_H = 2.5            # 前回のニュース更新からこの時間以上あいたらニュースだけ更新
+
+
+def plan_run(now_jst, prev_updated, prev_news_updated, force=False):
+    """'full' / 'news' / 'skip' を返す。now_jst は JST の naive datetime。
+    prev_updated=最後のフルビルド('YYYY-MM-DD HH:MM')・prev_news_updated=最後のニュース更新（無ければ prev_updated 扱い）。"""
+    if force or not prev_updated:
+        return 'full'
+    today = now_jst.strftime('%Y-%m-%d')
+    if prev_updated[:10] != today and now_jst.hour >= FULL_FROM_HOUR:
+        return 'full'
+    if now_jst.hour >= NEWS_FROM_HOUR:
+        try:
+            last = datetime.datetime.strptime((prev_news_updated or prev_updated)[:16], '%Y-%m-%d %H:%M')
+            if (now_jst - last).total_seconds() / 3600.0 >= NEWS_GAP_H:
+                return 'news'
+        except Exception:
+            return 'news'                            # 時刻が読めない＝古いとみなして取り直す側へ倒す
+    return 'skip'
+
+
+def finish_shelf(prev, vids, hist, now_str):
+    """ニュースだけ更新用: 新しい vids を前の棚(prev)へ差し込んで返す。
+    streak・shelf_days・quiet_days・yesterday_ids・new の基準は**動かさない**（同じ日の作り直しと同じ扱い）。
+    今日はじめて出た動画の streak は1、前回から居る動画は前回の値のまま。"""
+    prev_streak = dict((v['videoId'], int(v.get('streak') or 1)) for v in (prev.get('videos') or [])[:3])
+    for r, v in enumerate(vids, 1):
+        v['rank'] = r
+        h = hist.get(v['videoId'])
+        v['delta'] = (v['views'] - h) if isinstance(h, int) else None
+        v.pop('streak', None)
+    for v in vids[:3]:
+        v['streak'] = prev_streak.get(v['videoId'], 1)
+    return dict(prev, videos=vids, asof=now_str, stale=False, carried_days=0)
+
+
+def news_only():
+    """ニュースの棚だけを取り直して描き直す（検索0回・数十ユニット）。JP は news、EN は jpnews。
+    他の棚・history.json・pool.json・殿堂入りには1バイトも触らない。--news-only でも、plan_run が 'news' の時も呼ぶ。"""
+    if not API_KEY:
+        print('FATAL: 環境変数 YT_API_KEY が未設定'); sys.exit(1)
+    data = read_json(DATA, None)
+    if not data or not data.get('themes'):
+        print('FATAL: data.json が読めない/空。ニュースだけの更新は既存の台帳が前提（先にフルビルドが要る）'); sys.exit(1)
+    hist = read_json(HIST, {})
+    keys = [k for k in NEWS_KEYS if source_cfg(k)]
+    now_str = _now_jst().strftime('%Y-%m-%d %H:%M')
+    done = []
+    for key in keys:
+        idx = next((i for i, t in enumerate(data['themes']) if t.get('key') == key), None)
+        if idx is None:
+            print('SKIP news %s: 台帳にその棚が無い（フルビルドで作られる）' % key)
+            continue
+        prev = data['themes'][idx]
+        # 連日居座り: 前回ベスト3で streak が上限に達している動画はベスト3に選ばない
+        skip = set(v['videoId'] for v in (prev.get('videos') or [])[:3]
+                   if int(v.get('streak') or 1) >= TOP3_MAX_STREAK)
+        try:
+            vids, pool, how = channel_shelf_route(key, skip_top=skip)
+        except Exception as e:
+            # 取れなかった日は前の棚のまま（壊れた棚を書かない）。ただし握り潰さず出す
+            print('NG news %s: %s（前の棚のまま）' % (key, str(e)[:120]))
+            continue
+        th = finish_shelf(prev, vids, hist, now_str)
+        th['how'] = how
+        base = prev.get('yesterday_ids')
+        if base is not None:                         # 新顔の基準は前回のまま（昨日の棚に無かった動画に印を付ける）
+            base = set(base)
+            for v in th['videos']:
+                v['new'] = v['videoId'] not in base
+            th['new_count'] = sum(1 for v in th['videos'] if v.get('new'))
+        data['themes'][idx] = th
+        done.append('%s(%d本・ベスト3 %s)' % (key, len(vids), '/'.join('%.0fh' % (v.get('hours') or 0) for v in vids[:3])))
+    data['news_updated'] = now_str
+    write_json(DATA, data)
+    size = render_en(data) if EDITION == 'en' else render(data, load_hof())
+    print('NEWS-ONLY 更新=%s bytes=%d news_updated=%s' % (done or 'なし', size, now_str))
+
+
 # ---------------------------------------------------------------- 殿堂入り
 
 def hof_videos(queries, dur):
@@ -1350,6 +1752,33 @@ def save_hof(cache):
 
 # ---------------------------------------------------------------- 描画
 
+# 🆕 2026-11-28 うっちーPの歌タブは、題名が「#歌#作詞作曲「…」作詞：うっちー」のようにハッシュタグ群から始まる。
+#    英語版では20本とも日本語＋ハッシュタグ始まりで、読めない・探せないので、**表示だけ**先頭のハッシュタグ群を落とす。
+#    台帳(data.json)の title は変えない（YouTube上の本当の題名のまま持つ）。
+_LEAD_TAGS = re.compile(r'^(?:\s*[#＃][^\s#＃「『（(【\[]*)+\s*')
+
+
+def strip_lead_tags(t):
+    out = _LEAD_TAGS.sub('', t or '', count=1)
+    return out if out.strip() else (t or '')            # 全部ハッシュタグの題名は、そのまま出す（空にしない）
+
+
+def _ttl(v, strip=False):
+    return strip_lead_tags(v['title']) if strip else v['title']
+
+
+_ref_utc = None         # 「公開から○時間」の基準時刻。棚を作った時刻(asof)に揃える（render_only でも数字が動かない）
+
+
+def _jst_to_utc(s):
+    try:
+        t = datetime.datetime.strptime((s or '')[:16], '%Y-%m-%d %H:%M') - datetime.timedelta(hours=9)
+        return t.replace(tzinfo=datetime.timezone.utc)
+    except Exception:
+        return None
+
+
+
 def big(n):
     """1,234,567 -> 123万回。日本語の桁感で一瞬で読めるようにする。"""
     if n >= 100000000:
@@ -1360,7 +1789,18 @@ def big(n):
 
 
 def commentary(v):
-    """再生数と経過日数から事実ベースの一言を生成する（推測は書かない）。"""
+    """再生数と経過日数から事実ベースの一言を生成する（推測は書かない）。
+    🆕 2026-11-28: 公開の時刻(pubTs)があり48時間未満なら「公開から○時間で…」と時間で出す
+    （publishedAt は日付だけなので、公開3時間のニュースが「公開から1日」になっていた）。"""
+    h = hours_since(v, _ref_utc)
+    if h is not None and h < 48:
+        hh = max(1, int(h))
+        s = ('公開から' + str(hh) + '時間で' + big(v['views']) + '。1時間あたり約' +
+             format(int(v['views'] / max(1.0, h)), ',') + '回のペースです。')
+        d = v.get('delta')
+        if isinstance(d, int) and d > 0:
+            s += ' 前日から+' + format(d, ',') + '回。'
+        return s
     try:
         y, m, dd = [int(x) for x in v['publishedAt'].split('-')]
         days = max(1, (datetime.date.today() - datetime.date(y, m, dd)).days)
@@ -1377,7 +1817,7 @@ def commentary(v):
     return s
 
 
-def card(v):
+def card(v, strip=False):
     medal = ['gold', 'silver', 'bronze'][v['rank'] - 1]
     return ('<a class="card ' + medal + '" href="https://www.youtube.com/watch?v=' + html.escape(v['videoId']) +
             '" target="_blank" rel="noopener">'
@@ -1386,7 +1826,7 @@ def card(v):
             '<span class="dur">' + html.escape(v['duration']) + '</span>'
             + ('<span class="newb">NEW</span>' if v.get('new') else '') + '</div>'
             '<div class="mt"><p class="ch">' + html.escape(v['channelTitle']) + '</p>'
-            '<h3>' + html.escape(v['title']) + '</h3>'
+            '<h3>' + html.escape(_ttl(v, strip)) + '</h3>'
             '<p class="vw">' + big(v['views']) + '</p>'
             '<p class="cm">' + html.escape(commentary(v)) + '</p>'
             '<span class="btn">YouTubeで見る →</span></div></a>')
@@ -1408,7 +1848,7 @@ def delta_html(v):
     return '<span class="flat">±0</span>'
 
 
-def row(v):
+def row(v, strip=False):
     delta = delta_html(v)
     return ('<a class="row" href="https://www.youtube.com/watch?v=' + html.escape(v['videoId']) +
             '" target="_blank" rel="noopener">'
@@ -1416,13 +1856,13 @@ def row(v):
             ('<i class="newr">NEW</i>' if v.get('new') else '') + '</span>'
             '<span class="rtw"><img loading="lazy" src="' + html.escape(v['thumb']) + '" alt="">'
             '<i>' + html.escape(v['duration']) + '</i></span>'
-            '<span class="ri"><b>' + html.escape(v['title']) + '</b>'
+            '<span class="ri"><b>' + html.escape(_ttl(v, strip)) + '</b>'
             '<em>' + html.escape(v['channelTitle']) + '</em></span>'
             '<span class="rs"><u>' + format(v['views'], ',') + '</u>'
             '<i>前日比 ' + delta + '</i><i>コメント ' + format(v['comments'], ',') + '</i></span></a>')
 
 
-def feature(p):
+def feature(p, strip=False):
     """タブ先頭の「まず観る1本」枠。横長サムネ＋説明の1枚もの。
     ランキングとは別枠にしてあるので、再生数の順位を偽らずに入口動画を見せられる。"""
     return ('<a class="feat" href="https://www.youtube.com/watch?v=' + html.escape(p['videoId']) +
@@ -1430,7 +1870,7 @@ def feature(p):
             '<span class="ftw"><img loading="lazy" src="' + html.escape(p['thumb']) + '" alt="">'
             '<i>' + html.escape(p['duration']) + '</i></span>'
             '<span class="fmt"><em>' + html.escape(p['lead']) + '</em>'
-            '<b>' + html.escape(p['title']) + '</b>'
+            '<b>' + html.escape(_ttl(p, strip)) + '</b>'
             '<span class="fnote">' + html.escape(p['note']) + '</span>'
             '<span class="fviews">▶ ' + big(p['views']) + '</span></span></a>')
 
@@ -1465,6 +1905,8 @@ def today_pane(t, on):
        総再生数順にすると昔から強い動画が何日も居座り、下の段(殿堂入り)と
        同じ顔ぶれになって段を分けた意味が消えるため（内田さん指摘 2026-08-26）。
     """
+    global _ref_utc
+    _ref_utc = _jst_to_utc(t.get('asof'))        # 「公開から○時間」は棚を作った時刻を基準にする
     vids = t['videos']
     stale = ('<br><small>※ ' + html.escape(t.get('asof', '')) +
              ' 時点のままです（本日の取得に失敗したため）</small>') if t.get('stale') else ''
@@ -1537,14 +1979,14 @@ def own_pane(t, on):
     if not t:
         return ''
     vids = t['videos']
-    pin = feature(t['pinned']) if t.get('pinned') else ''
+    pin = feature(t['pinned'], True) if t.get('pinned') else ''
     rows = ('<h3 class="rh own">4位〜' + str(len(vids)) + '位</h3><div class="rows">' +
-            ''.join(row(v) for v in vids[3:]) + '</div>') if len(vids) > 3 else ''
+            ''.join(row(v, True) for v in vids[3:]) + '</div>') if len(vids) > 3 else ''
     head = ('<div class="lead"><span class="lbadge own">うっちーPの歌</span>'
             '<h2>再生回数トップ' + str(len(vids)) + '</h2>'
             '<p>' + html.escape(t['note']) + '</p></div>')
     return pane('p-own-' + t['key'], on,
-                head + pin + '<div class="top3">' + ''.join(card(v) for v in vids[:3]) + '</div>' + rows)
+                head + pin + '<div class="top3">' + ''.join(card(v, True) for v in vids[:3]) + '</div>' + rows)
 
 
 def render(d, hofc):
@@ -1614,9 +2056,16 @@ def render(d, hofc):
         _ut = '%d/%d %s' % (_u.month, _u.day, _u.strftime('%H:%M'))
     except Exception:
         _ut = d.get('updated', '')
+    # 🆕 2026-11-28 ニュースは日中に何度か取り直す（news_updated）。時刻だけ出す＝「今のニュースか？」を確かめられる。
+    _nt = ''
+    try:
+        _nu = datetime.datetime.strptime(d['news_updated'][:16], '%Y-%m-%d %H:%M')
+        _nt = '　<span class="upd">ニュース更新 ' + _nu.strftime('%H:%M') + '</span>'
+    except Exception:
+        pass
     newtotal = (('<p class="sub3">🆕 きょうの新顔: 全ジャンルで <b>' +
-                 str(sum(t['new_count'] for t in _known)) + '本</b>　<span class="upd">更新 ' + _ut + '</span></p>')
-                if _known else '<p class="sub3"><span class="upd">更新 ' + _ut + '</span></p>')
+                 str(sum(t['new_count'] for t in _known)) + '本</b>　<span class="upd">更新 ' + _ut + '</span>' + _nt + '</p>')
+                if _known else '<p class="sub3"><span class="upd">更新 ' + _ut + '</span>' + _nt + '</p>')
     out = (tpl.replace('__BODY__', body).replace('__UPD__', d['updated']).replace('__NEWTOTAL__', newtotal)
               .replace('__T_HOT__', str(HOT_TIERS[0])).replace('__C_HOT__', str(HOT_TIERS[-1]))
               .replace('__T_NORM__', str(NORMAL_TIERS[0])).replace('__C_NORM__', str(NORMAL_TIERS[-1]))
@@ -1664,7 +2113,17 @@ def big_en(n):
 
 
 def commentary_en(v):
-    """再生数と経過日数から事実ベースの一言を生成する（JP版 commentary() の英語版）。"""
+    """再生数と経過日数から事実ベースの一言を生成する（JP版 commentary() の英語版）。
+    公開48時間未満で pubTs があれば時間で出す（JP版と同じ・2026-11-28）。"""
+    h = hours_since(v, _ref_utc)
+    if h is not None and h < 48:
+        hh = max(1, int(h))
+        s = 'Published %d hour%s ago — now at %s (about %s/hour).' % (
+            hh, '' if hh == 1 else 's', big_en(v['views']), format(int(v['views'] / max(1.0, h)), ','))
+        d = v.get('delta')
+        if isinstance(d, int) and d > 0:
+            s += ' +%s since yesterday.' % format(d, ',')
+        return s
     try:
         y, m, dd = [int(x) for x in v['publishedAt'].split('-')]
         days = max(1, (datetime.date.today() - datetime.date(y, m, dd)).days)
@@ -1681,7 +2140,7 @@ def commentary_en(v):
     return s
 
 
-def card_en(v):
+def card_en(v, strip=False):
     medal = ['gold', 'silver', 'bronze'][v['rank'] - 1]
     return ('<a class="card ' + medal + '" href="https://www.youtube.com/watch?v=' + html.escape(v['videoId']) +
             '" target="_blank" rel="noopener">'
@@ -1690,13 +2149,13 @@ def card_en(v):
             '<span class="dur">' + html.escape(v['duration']) + '</span>'
             + ('<span class="newb">NEW</span>' if v.get('new') else '') + '</div>'
             '<div class="mt"><p class="ch">' + html.escape(v['channelTitle']) + '</p>'
-            '<h3>' + html.escape(v['title']) + '</h3>'
+            '<h3>' + html.escape(_ttl(v, strip)) + '</h3>'
             '<p class="vw">' + big_en(v['views']) + '</p>'
             '<p class="cm">' + html.escape(commentary_en(v)) + '</p>'
             '<span class="btn">Watch on YouTube →</span></div></a>')
 
 
-def row_en(v):
+def row_en(v, strip=False):
     delta = delta_html(v)   # 記号ベース(+/-/—)なので言語非依存・JP版の関数をそのまま使う
     return ('<a class="row" href="https://www.youtube.com/watch?v=' + html.escape(v['videoId']) +
             '" target="_blank" rel="noopener">'
@@ -1704,33 +2163,36 @@ def row_en(v):
             ('<i class="newr">NEW</i>' if v.get('new') else '') + '</span>'
             '<span class="rtw"><img loading="lazy" src="' + html.escape(v['thumb']) + '" alt="">'
             '<i>' + html.escape(v['duration']) + '</i></span>'
-            '<span class="ri"><b>' + html.escape(v['title']) + '</b>'
+            '<span class="ri"><b>' + html.escape(_ttl(v, strip)) + '</b>'
             '<em>' + html.escape(v['channelTitle']) + '</em></span>'
             '<span class="rs"><u>' + format(v['views'], ',') + ' views</u>'
             '<i>vs yesterday ' + delta + '</i><i>' + format(v['comments'], ',') + ' comments</i></span></a>')
 
 
-def feature_en(p):
+def feature_en(p, strip=False):
     return ('<a class="feat" href="https://www.youtube.com/watch?v=' + html.escape(p['videoId']) +
             '" target="_blank" rel="noopener">'
             '<span class="ftw"><img loading="lazy" src="' + html.escape(p['thumb']) + '" alt="">'
             '<i>' + html.escape(p['duration']) + '</i></span>'
             '<span class="fmt"><em>' + html.escape(p['lead']) + '</em>'
-            '<b>' + html.escape(p['title']) + '</b>'
+            '<b>' + html.escape(_ttl(p, strip)) + '</b>'
             '<span class="fnote">' + html.escape(p['note']) + '</span>'
             '<span class="fviews">▶ ' + big_en(p['views']) + '</span></span></a>')
 
 
 def theme_pane_en(t, on):
+    global _ref_utc
+    _ref_utc = _jst_to_utc(t.get('asof'))
+    strip = t.get('key') == OWN_KEY             # うっちーPの歌は先頭のハッシュタグ群を表示だけ落とす
     vids = t['videos']
     stale = ('<br><small>※ Still showing the ' + html.escape(t.get('asof', '')) +
              ' JST snapshot (today’s fetch failed).</small>') if t.get('stale') else ''
-    pin = feature_en(t['pinned']) if t.get('pinned') else ''
+    pin = feature_en(t['pinned'], strip) if t.get('pinned') else ''
     how = ('<br><small>' + html.escape(t['how']) + '</small>') if t.get('how') else ''
     rest = ''
     if len(vids) > 3:
         rest = ('<h3 class="rh">#4 – #' + str(len(vids)) + '</h3>'
-                '<div class="rows">' + ''.join(row_en(v) for v in vids[3:]) + '</div>')
+                '<div class="rows">' + ''.join(row_en(v, strip) for v in vids[3:]) + '</div>')
     nc = t.get('new_count')
     if nc is None:
         newline = ''
@@ -1742,7 +2204,7 @@ def theme_pane_en(t, on):
             '<h2>' + html.escape(t['label']) + ' — Top 3</h2>'
             '<p>' + html.escape(t['note']) + how + stale + '</p>' + newline + '</div>')
     return pane('p-' + t['key'], on,
-                head + pin + '<div class="top3">' + ''.join(card_en(v) for v in vids[:3]) + '</div>' + rest)
+                head + pin + '<div class="top3">' + ''.join(card_en(v, strip) for v in vids[:3]) + '</div>' + rest)
 
 
 def render_en(d):
@@ -1779,9 +2241,15 @@ def render_en(d):
         _ut = '%d/%d %s JST' % (_u.month, _u.day, _u.strftime('%H:%M'))
     except Exception:
         _ut = d.get('updated', '')
+    _nt = ''
+    try:
+        _nu = datetime.datetime.strptime(d['news_updated'][:16], '%Y-%m-%d %H:%M')
+        _nt = '　<span class="upd">News updated ' + _nu.strftime('%H:%M') + ' JST</span>'
+    except Exception:
+        pass
     newtotal = (('<p class="sub3">\U0001f195 New across every genre today: <b>' +
-                 str(sum(t['new_count'] for t in _known)) + '</b>　<span class="upd">Updated ' + _ut + '</span></p>')
-                if _known else '<p class="sub3"><span class="upd">Updated ' + _ut + '</span></p>')
+                 str(sum(t['new_count'] for t in _known)) + '</b>　<span class="upd">Updated ' + _ut + '</span>' + _nt + '</p>')
+                if _known else '<p class="sub3"><span class="upd">Updated ' + _ut + '</span>' + _nt + '</p>')
     out = (tpl.replace('__BODY__', body).replace('__UPD__', d['updated']).replace('__NEWTOTAL__', newtotal)
               .replace('__T_NORM__', str(NORMAL_TIERS[0])).replace('__C_NORM__', str(NORMAL_TIERS[-1]))
               .replace('__STREAK__', str(TOP3_MAX_STREAK)).replace('__FILL__', str(FILL_DAYS))
@@ -1807,21 +2275,24 @@ def main():
     prev_themes = dict((t['key'], t) for t in _pd.get('themes', []) if t.get('key'))
     prev_updated = _pd.get('updated', '')
     now_jst = _now_jst().strftime('%Y-%m-%d %H:%M')
-    # 🚨 同じ日に何度も走らない（2026-09-02）。daily.yml に予備の cron を複数置いたので、
-    #    直前のビルドが MIN_INTERVAL_H 以内なら何もしない。手動実行(FORCE=1)は例外。
-    if prev_updated and not os.environ.get('FORCE'):
-        try:
-            _gap = (datetime.datetime.strptime(now_jst, '%Y-%m-%d %H:%M') -
-                    datetime.datetime.strptime(prev_updated[:16], '%Y-%m-%d %H:%M')).total_seconds() / 3600.0
-        except Exception:
-            _gap = 10 ** 6
-        if 0 <= _gap < MIN_INTERVAL_H:
-            print('SKIP 直前のビルド(%s)から%.1fh。%dh未満なので今回は何もしない（予備cronの空振り）'
-                  % (prev_updated, _gap, MIN_INTERVAL_H))
-            return
+    # 🚨 2026-11-28: 「前回から6時間以内なら何もしない」(MIN_INTERVAL_H)をやめて、日付と時刻で決める計画へ（plan_run の注記参照）。
+    #    daily.yml は30分おきに発火する。FORCE=1（手動実行）は必ずフルビルド。
+    _plan = plan_run(_now_jst().replace(tzinfo=None), prev_updated, _pd.get('news_updated', ''),
+                     bool(os.environ.get('FORCE')))
+    if _plan == 'skip':
+        print('SKIP 今回は何もしない（前回のフルビルド %s・ニュース更新 %s・今は %s JST）'
+              % (prev_updated, _pd.get('news_updated') or '—', now_jst))
+        return
+    if _plan == 'news':
+        print('PLAN ニュースだけ更新（今日のフルビルドは済み・前回のニュース更新 %s）' % (_pd.get('news_updated') or prev_updated))
+        news_only()
+        return
+    print('PLAN フルビルド（前回 %s）' % (prev_updated or 'なし'))
     data = {'region': REGION, 'site': SITE_URL,
             # GitHub Actions は UTC で動くので、表示は日本時間に直す
             'updated': now_jst,
+            # 🆕 ニュース棚の最終更新。フルビルドの時も同じ値（ニュースだけ更新は news_updated だけ進む）
+            'news_updated': now_jst,
             'themes': []}
     newhist, failed, carried, pending = {}, [], [], []
     # 🚨 連日居座りの記録（2026-09-02）。前回ベスト3だった動画の連続日数を引き継ぐ。
@@ -1849,6 +2320,19 @@ def main():
     for key, label, q, dur, note in jobs:
         pool, how, alive = [], '', set()
         try:
+            # 🆕 2026-11-28 sources.json に発信元がある棚（ニュース・エンタメ）は、チャンネルの新着から作る。
+            #    取れなかった日は chan が None のまま＝下の従来の取得経路（カテゴリ急上昇＋検索）へ落ちる（棚を空にしない）。
+            chan = None
+            if key not in ('trend', OWN_KEY) and source_cfg(key):
+                _hot = key in HOT_KEYS
+                _blk = set(vid for (k2, vid), s in prev_streak.items()
+                           if k2 == key and s >= TOP3_MAX_STREAK) | set(_used_ids)
+                _tir = set(vid for vid, n in prev_shelf.get(key, {}).items()
+                           if n >= (HOT_SHELF_MAX_DAYS if _hot else SHELF_MAX_DAYS))
+                try:
+                    chan = channel_shelf_route(key, skip_top=_blk | _tir)
+                except Exception as e:
+                    print('   └ %s: チャンネルの新着は作れず（%s）。従来の取得経路へ' % (label, str(e)[:100]))
             if key == 'trend':
                 # 公式の急上昇チャートそのもの＝すでに「その日いちばん伸びているもの」の並び。
                 # ここだけは自前で並べ替えない（YouTube側の順位が最も正確なため）。
@@ -1857,6 +2341,12 @@ def main():
             elif key == OWN_KEY:
                 pool = own_songs()
                 vids = pool
+            elif chan is not None:
+                vids, pool, how = chan
+                alive = set(v['videoId'] for v in pool)
+                vids = demote_used(vids, keep_head=3)    # ベスト3は確定済み。4位以下だけ既出を後ろへ
+                for v in vids:
+                    _used_ids.add(v['videoId'])
             else:
                 hot = key in HOT_KEYS                     # 旬タブ=情報の鮮度が命
                 tiers = HOT_TIERS if hot else NORMAL_TIERS
@@ -2108,6 +2598,38 @@ def _mode_en(japanese_mode):
     return 'views'
 
 
+def jmusic_videos():
+    """J-Music 棚。日本の音楽カテゴリ(10)の急上昇を YouTube の並びのまま返す（1ユニット・検索0回）。
+    縦動画は hydrate が外す。70秒以下も外す。題名は日本語のまま出す方針（Trending in Japan と同じ）。"""
+    r = api('videos', {'part': 'id', 'chart': 'mostPopular', 'regionCode': 'JP', 'videoCategoryId': '10',
+                       'maxResults': 50})
+    ids = [i['id'] for i in r.get('items', [])]
+    order = dict((i, n) for n, i in enumerate(ids))
+    got = [v for v in hydrate(ids) if v.get('_secs', 0) > SHORTS_MAX_SEC and '#short' not in v['title'].lower()]
+    got.sort(key=lambda v: order.get(v['videoId'], 999))     # videos.list は id 順で返るとは限らない＝急上昇の順へ戻す
+    return dedupe_titles(got)
+
+
+def is_english_title(t):
+    """曲名が英語か。「曲名」は題名の中の最初の「」『』の中身で判定する（無ければ先頭のハッシュタグ群を除いた題名全体）。
+    ASCII の英字が文字（かな・漢字・英字…）の8割以上なら英語。
+    「#歌#作詞作曲「A Sea of Milk」Lyrics: Ucchi」のように日本語の飾りが付く題名も拾い、
+    「fabas -song : kiku「夜の手」作詞…」のように英語の飾りが付いた日本語の曲名は拾わない
+    （2026-11-28 実測: 英語の曲名は20本中5本。題名全体の比率だと per person は5割・夜の手も5割で見分けがつかなかった）。"""
+    t = strip_lead_tags(t)
+    m = re.search(r'[「『]([^」』]+)[」』]', t)
+    core = m.group(1) if m else t
+    letters = [c for c in core if c.isalpha()]
+    ascii_n = sum(1 for c in letters if c.isascii())
+    return ascii_n >= 6 and ascii_n >= len(letters) * 0.8
+
+
+def english_first(vids):
+    """英語版の Ucchii-P's Songs: 英語の題名の曲を先頭へ（元の再生数順は保つ）。読めない題名が20本並ぶのを避ける。"""
+    en = [v for v in vids if is_english_title(v['title'])]
+    return en + [v for v in vids if v not in en]
+
+
 def main_en():
     """Japan Buzz（英語版）のビルド。configure_edition('en') 済みが前提。
 
@@ -2125,19 +2647,20 @@ def main_en():
     prev_themes = dict((t['key'], t) for t in _pd.get('themes', []) if t.get('key'))
     prev_updated = _pd.get('updated', '')
     now_jst = _now_jst().strftime('%Y-%m-%d %H:%M')
-    # JP版と同じ「同日再実行ガード」。daily.yml は同じジョブの中でJP版の直後にこれを実行するので、
-    # 直前ビルド=JP版の時刻との差になる。EN版はJP版よりわずかに遅れて走るだけなので実害はない。
-    if prev_updated and not os.environ.get('FORCE'):
-        try:
-            _gap = (datetime.datetime.strptime(now_jst, '%Y-%m-%d %H:%M') -
-                    datetime.datetime.strptime(prev_updated[:16], '%Y-%m-%d %H:%M')).total_seconds() / 3600.0
-        except Exception:
-            _gap = 10 ** 6
-        if 0 <= _gap < MIN_INTERVAL_H:
-            print('SKIP(en) 直前のビルド(%s)から%.1fh。%dh未満なので今回は何もしない'
-                  % (prev_updated, _gap, MIN_INTERVAL_H))
-            return
-    data = {'region': REGION, 'site': SITE_URL, 'updated': now_jst, 'themes': []}
+    # 🚨 2026-11-28 JP版と同じ計画（plan_run）。日付と時刻でフル/ニュースだけ/何もしない を決める。
+    #    EN版は自分の data.json(en/data.json)の更新時刻で決める（JP版の成否に引きずられない）。
+    _plan = plan_run(_now_jst().replace(tzinfo=None), prev_updated, _pd.get('news_updated', ''),
+                     bool(os.environ.get('FORCE')))
+    if _plan == 'skip':
+        print('SKIP(en) nothing to do (last full build %s, news %s, now %s JST)'
+              % (prev_updated, _pd.get('news_updated') or '-', now_jst))
+        return
+    if _plan == 'news':
+        print('PLAN(en) news-only refresh (last news update %s)' % (_pd.get('news_updated') or prev_updated))
+        news_only()
+        return
+    print('PLAN(en) full build (previous %s)' % (prev_updated or 'none'))
+    data = {'region': REGION, 'site': SITE_URL, 'updated': now_jst, 'news_updated': now_jst, 'themes': []}
     newhist, failed, carried, pending = {}, [], [], []
     prev_streak = {}
     for _k, _t in prev_themes.items():
@@ -2165,7 +2688,18 @@ def main_en():
                 vids = pool[:LIST_N]
             elif key == OWN_KEY:
                 pool = own_songs()          # チャンネルは共通。ownch_top.jsonキャッシュもJP版と共有
-                vids = pool
+                vids = english_first(pool)  # 🆕 英語の題名の曲を先頭へ（表示は並びだけ・台帳の title は変えない）
+            elif key == 'jpnews':
+                # 🆕 2026-11-28 日本のニュース（英語）。en/sources.json のニュース局の新着から作る（検索0回）。
+                #    取れない日は例外 → 前日引き継ぎ（従来の取得経路は無い新設の棚）
+                _blk = set(vid for (k2, vid), st in prev_streak.items() if k2 == key and st >= TOP3_MAX_STREAK)
+                vids, pool, how = channel_shelf_route(key, skip_top=_blk)
+                alive = set(v['videoId'] for v in pool)
+            elif key == 'jmusic':
+                # 🆕 日本の音楽カテゴリの急上昇を、YouTube の並びのまま（1ユニット・検索0回）。題名は日本語のまま出す
+                pool = jmusic_videos()
+                vids = pool[:LIST_N]
+                how = "source: YouTube's music trending chart for Japan / order: YouTube's own trending order"
             else:
                 # EN版は全タブ NORMAL_TIERS(7/14/30日)・FILL_DAYS(31日)固定。旬/通常の区別は無い。
                 block = set(vid for (k2, vid), s in prev_streak.items()
@@ -2179,11 +2713,23 @@ def main_en():
                 if _before - len(pool):
                     print('   └ drop %d off-topic (topic rules for this shelf): %d -> %d'
                           % (_before - len(pool), _before, len(pool)))
+                _minv = EN_SEARCH_MIN_VIEWS.get(key, 0)
+                if _minv:
+                    _b2 = len(pool)
+                    pool = [v for v in pool if v.get('views', 0) >= _minv]
+                    print('   └ drop %d under %d views for this shelf: %d -> %d' % (_b2 - len(pool), _minv, _b2, len(pool)))
                 _lim = (_fresh_only.get(key, set()), FRESH_MAX[key]) if key in FRESH_MAX else None
                 vids = rank_today(pool, hist, set(), tiers=NORMAL_TIERS, block=block | tired, tired=tired,
                                   limit=_lim)
                 if pool:
                     vids = topup(vids, pool, set(), max_age=FILL_DAYS, tired=tired)
+                # 🆕 2026-11-28 信頼できる作り手・公式の新着を先頭へ（en/sources.json に載っている棚だけ）。
+                #    検索候補は後ろ。新着が取れない日は何も足さない＝従来どおりの棚になる。
+                boost = channel_boost(key, skip_top=block | tired)
+                if boost:
+                    _bi = set(v['videoId'] for v in boost)
+                    vids = (boost + [v for v in vids if v['videoId'] not in _bi])[:LIST_N]
+                    pool = pool + [v for v in boost if v['videoId'] not in set(x['videoId'] for x in pool)]
                 alive = set(v['videoId'] for v in pool)
                 _ok = [v for v in vids if v.get('views', 0) >= FILL_MIN_VIEWS]
                 if len(_ok) >= 10 and len(_ok) < len(vids):
@@ -2194,6 +2740,9 @@ def main_en():
                 for v in vids:
                     _used_ids.add(v['videoId'])
                 _src = 'search, last %d days' % FILL_DAYS
+                if boost:
+                    _src = ('new uploads from %d trusted channels (last %d days) first, then ' %
+                            (len(source_cfg(key)['channels']), int(source_cfg(key).get('max_hours', 240)) // 24)) + _src
                 if FRESH.get(key):
                     _src += ' + new uploads from the last %d days' % min(s[2] for s in FRESH[key])
                 how = ('source: %s / order: %s / top3 within %d days'
@@ -2401,6 +2950,10 @@ if __name__ == '__main__':
     configure_edition(_parse_edition())
     if '--render-only' in sys.argv:
         render_only_en() if EDITION == 'en' else render_only()
+    elif '--news-only' in sys.argv:
+        # 🆕 2026-11-28 ニュースの棚だけを取り直して描き直す（JP=ニュース / EN=Japan News・検索0回）。daily.yml の
+        #    日中の回は plan_run が自動でここへ振り分けるが、手動でも呼べる。
+        news_only()
     elif '--hof-only' in sys.argv:
         if EDITION == 'en':
             print('EN版に殿堂入りタブは無いので --hof-only は何もしない')

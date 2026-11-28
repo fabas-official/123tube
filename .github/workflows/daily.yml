@@ -1,21 +1,29 @@
 name: daily-build
 
 # 内田さんのPCが落ちていても GitHub 側で走る。
-# 🚨 GitHub の schedule は数時間遅れる（実測: 06:10 JST 指定で 08:13〜14:18 JST に発火・2026-08-28〜09-02）。
-#    朝に見る人へ「今日」を出すため、本命 03:17 JST に加えて予備を 05:43 / 07:29 JST に置く。
-#    直前のビルドから6時間以内なら build.py が何もせず終わる（API消費ゼロ・commitも無し）ので、
-#    3本とも発火しても朝の更新は1回だけ。分は :00 を避けている（毎時0分は混雑で遅れやすい）。
-# workflow_dispatch を付けてあるので、手動実行ボタンからいつでも即時更新できる（FORCE=1 で間隔ガードを無視）。
+# 🚨 2026-11-28 作り直し: GitHub の schedule は数時間遅れる。実測（2026-11-25〜27）: 指定 03:17 JST → 実際の発火 10:45〜13:00 JST
+#    （6〜7.5時間遅れ）。以前は「03:17/05:43/07:29 に3回指定＋前回から6時間以内なら何もしない」で朝の更新を狙っていたが、
+#    遅れた1回が当日の唯一の更新になり、朝に開くと昨日の棚だった。
+#    → 30分おきに発火させ、何をするかは build.py の plan_run() が**日付と時刻**で決める:
+#        ・今日のフルビルドがまだ無く、JST 04:00 以降 → フルビルド（遅延が何時間あっても、04:00 を過ぎて最初に発火した回が
+#          その日のフルビルド＝1日1回。前日比・streak・新顔の意味を保つ）
+#        ・それ以外で JST 06:00〜24:00 かつ前回のニュース更新から2.5時間以上 → ニュースの棚だけ取り直す（検索0回）
+#        ・それ以外 → 何もしない（何も書かない・commit も無い）
+#    分は :00 を避けている（毎時0分は混雑で遅れやすい）。
+# workflow_dispatch を付けてあるので、手動実行ボタンからいつでも即時のフルビルドができる（FORCE=1）。
 on:
   schedule:
-    - cron: '17 18 * * *'
-    - cron: '43 20 * * *'
-    - cron: '29 22 * * *'
+    - cron: '17,47 * * * *'
   workflow_dispatch:
 
 # index.html / data.json を書き戻すため書き込み権限が要る
 permissions:
   contents: write
+
+# 30分おきに発火するので、前の回が長引いても重ならないよう直列にする（途中の回を止めない＝cancel しない）
+concurrency:
+  group: daily-build
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -46,8 +54,10 @@ jobs:
           FORCE: ${{ github.event_name == 'workflow_dispatch' && '1' || '' }}
         run: python build.py --edition en
 
-      # 差分が無い日は commit しない（空コミットでヒストリを汚さない）。JP/EN 両方のファイルをまとめて1コミット。
+      # 差分が無い回は commit しない（空コミットでヒストリを汚さない）。JP/EN 両方のファイルをまとめて1コミット。
       # if: always() で片方のビルドが失敗しても、もう片方が更新できていればそのファイルだけでも反映する。
+      # 30分おきに走るので、前の回の push が先に入っていても落ちないよう、commit のあとに pull --rebase してから push する
+      # （生成物は毎回その回のものが正なので、競合した時は自分の側＝新しい側を採る）。push は3回まで試す。
       - name: Commit updated site
         if: always()
         run: |
@@ -58,6 +68,17 @@ jobs:
           if git diff --staged --quiet; then
             echo "変更なし。コミットをスキップ"
           else
-            git commit -m "daily update $(date -u -d '+9 hours' '+%Y-%m-%d %H:%M') JST"
-            git push
+            # history.json はフルビルドの時だけ変わる＝それがあれば「フル」、無ければ「ニュースだけ」
+            # （フルのメッセージは今までどおり "daily update" ＝ 監視・朝の確認がこの文言で最終フルビルドを探す）
+            if git diff --staged --name-only | grep -qE '(^|/)history\.json$'; then MSG=daily; else MSG=news; fi
+            git commit -m "$MSG update $(date -u -d '+9 hours' '+%Y-%m-%d %H:%M') JST"
+            pushed=0
+            for i in 1 2 3; do
+              git pull --rebase -X theirs origin "${GITHUB_REF_NAME:-main}" || git rebase --abort || true
+              if git push; then pushed=1; break; fi
+              echo "push 失敗（${i}回目）。取り直して再試行"
+              sleep 5
+            done
+            # 3回とも失敗したら赤くする（黙って成功にしない＝滞りを監視が拾える）
+            [ "$pushed" = 1 ] || { echo "push に3回失敗"; exit 1; }
           fi

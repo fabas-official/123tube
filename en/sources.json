@@ -1,0 +1,169 @@
+{
+ "_note": "英語版（Japan Buzz）の発信元。コードを触らずにチャンネルを足せる（id は channels.list で照合済みのものだけ）。2026-11-28 PM設計。",
+ "jpnews": {
+  "how_source": "English-language newsrooms in Japan",
+  "top3_hours": 36,
+  "max_hours": 72,
+  "fill_hours": 240,
+  "min_views": 500,
+  "per_channel": 6,
+  "pages": 2,
+  "ng_title": [
+   "GRAND SUMO",
+   "Trails to",
+   "Journeys in Japan",
+   "Core Kyoto",
+   "Cool Japan",
+   "Dining with the Chef",
+   "Begin Japanology",
+   "Japanology"
+  ],
+  "channels": [
+   {
+    "id": "UCSPEjw8F2nQDtmUKPFNF7_A",
+    "name": "NHK WORLD-JAPAN"
+   },
+   {
+    "id": "UCJD2Br_xC-3vY4nkJ9YPYDA",
+    "name": "Nippon TV News 24 Japan"
+   },
+   {
+    "id": "UCo_QfGG3FlWVh3Z0AoxuwBA",
+    "name": "The Japan Times"
+   },
+   {
+    "id": "UC3jD0WbZSiRCSvg9gnqNGWA",
+    "name": "Kyodo News English"
+   },
+   {
+    "id": "UCVUuzqkjtF29vAyLgu10htg",
+    "name": "Japan Forward"
+   }
+  ]
+ },
+ "anime": {
+  "how_source": "official anime channels",
+  "max_hours": 240,
+  "boost_max": 12,
+  "min_views": 1000,
+  "per_channel": 4,
+  "pages": 2,
+  "channels": [
+   {
+    "id": "UC6pGDc4bFGD1_36IKv3FnYg",
+    "name": "Crunchyroll"
+   },
+   {
+    "id": "UCDb0peSmF5rLX7BvuTcJfCw",
+    "name": "Aniplex USA"
+   },
+   {
+    "id": "UCBSs9x2KzSLhyyA9IKyt4YA",
+    "name": "Netflix Anime"
+   },
+   {
+    "id": "UC14Yc2Qv92DMuyNRlHvpo2Q",
+    "name": "TOHO animation"
+   },
+   {
+    "id": "UCeFzTMpr7ik6oU5MT_YAYzg",
+    "name": "HIDIVE"
+   },
+   {
+    "id": "UCGbshtvS9t-8CW11W7TooQg",
+    "name": "Muse Asia"
+   },
+   {
+    "id": "UC2FwiPk6BYIpnBzN20lEhYA",
+    "name": "Sentai Filmworks"
+   }
+  ],
+  "top3_hours": 72
+ },
+ "travel": {
+  "how_source": "trusted Japan travel creators",
+  "max_hours": 336,
+  "boost_max": 8,
+  "min_views": 5000,
+  "per_channel": 2,
+  "pages": 1,
+  "channels": [
+   {
+    "id": "UCHL9bfHTxCMi-7vfxQ-AYtg",
+    "name": "Abroad in Japan"
+   },
+   {
+    "id": "UCnrVURWNd7VYjlQQ0UDpOQQ",
+    "name": "Tokyo Lens"
+   },
+   {
+    "id": "UCixD9UbKvDxzGNiPC_fgHyA",
+    "name": "Paolo fromTOKYO"
+   },
+   {
+    "id": "UCDsvL48jluG3tvlyurB4K3g",
+    "name": "ONLY in JAPAN * GO"
+   },
+   {
+    "id": "UCrroaGjAjAjqXEjqdsjLMIw",
+    "name": "Currently Hannah"
+   },
+   {
+    "id": "UCW_yDyDfu1bpqDNxeobW02Q",
+    "name": "internationally ME"
+   },
+   {
+    "id": "UCAKZ2vtm_-hfqeCGTNNbZqA",
+    "name": "Tokidoki Traveller"
+   },
+   {
+    "id": "UC-CWBoT-r7VijIr8YZTtzxA",
+    "name": "Solo Travel Japan"
+   },
+   {
+    "id": "UCfFrsS14viloVm1dKqHSoxQ",
+    "name": "Japan Guide"
+   }
+  ],
+  "top3_hours": 96
+ },
+ "food": {
+  "how_source": "trusted Japan food creators",
+  "max_hours": 336,
+  "boost_max": 8,
+  "min_views": 5000,
+  "per_channel": 2,
+  "pages": 1,
+  "channels": [
+   {
+    "id": "UCCyR9oAyHGSvZnYoGv3Qu1Q",
+    "name": "Japan byFood"
+   },
+   {
+    "id": "UC6Je3-ZV_x38NqQAxKiCCyQ",
+    "name": "TabiEats"
+   },
+   {
+    "id": "UCdfhVbZsOMwRn4A0LO5k0ww",
+    "name": "Japanese Food Craftsman"
+   },
+   {
+    "id": "UCLLC4hipTYA1e-Rv-l31Z_w",
+    "name": "Kimono Mom"
+   },
+   {
+    "id": "UCRxAgfYexGLlu1WHGIMUDqw",
+    "name": "JunsKitchen"
+   },
+   {
+    "id": "UCj3yKYDZr41QOLuDhfa6mcQ",
+    "name": "Champ's Japanese Kitchen"
+   },
+   {
+    "id": "UCpprBWvibvmOlI8yJOEAAjA",
+    "name": "Cooking with Dog"
+   }
+  ],
+  "top3_hours": 168
+ }
+}
