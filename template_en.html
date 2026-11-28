@@ -253,14 +253,15 @@ document.querySelectorAll('.tab').forEach(function (b) {
 });
 
 // 「ジャンルへ戻る」ボタン。ナビ（main の先頭）が画面の上へ消えたら出す。
-(function () {
+// ボタンはこのスクリプトより後ろに書いてあるので、読み込みが終わってから探す（先に探すと見つからず何も起きない）。
+document.addEventListener('DOMContentLoaded', function () {
   var b = document.querySelector('.totop'), m = document.querySelector('main');
   if (!b || !m) { return; }
   function upd() { b.classList.toggle('show', window.scrollY > m.offsetTop + 500); }
   window.addEventListener('scroll', upd, { passive: true });
   b.addEventListener('click', function () { m.scrollIntoView({ block: 'start', behavior: 'smooth' }); });
   upd();
-})();
+});
 </script>
 <button class="totop" type="button" aria-label="Back to genres">▲ Genres</button>
 </body></html>
