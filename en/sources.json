@@ -44,9 +44,9 @@
  "anime": {
   "how_source": "official anime channels",
   "max_hours": 240,
-  "boost_max": 12,
+  "boost_max": 20,
   "min_views": 1000,
-  "per_channel": 4,
+  "per_channel": 5,
   "pages": 2,
   "channels": [
    {

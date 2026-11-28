@@ -313,8 +313,10 @@ SONG_HINT = ('作詞', 'Fabas', 'ファバス', 'オリジナル曲', 'MV', 'ミ
 THEMES_EN = [
     # 2026-10-09: 説明文に公式の予告を足した（新着の検索 FRESH_EN で予告が並ぶようになったため。棚の中身と説明を揃える）。
     ('anime', 'Anime', ['anime amv edit'], 'medium',
-     "Official trailers for what's airing next, plus the fan edits and AMVs buzzing right now — the clip "
-     "culture that made anime travel outside Japan in the first place. No full-episode reposts."),
+     # 2026-11-28: 公式チャンネルの新着だけで埋める形にしたので、説明も中身に合わせた（「ファンの編集」と
+     # 書いたまま公式だけが並ぶと、説明と棚が食い違う）。
+     "Fresh trailers and clips straight from the official channels — Crunchyroll, Netflix Anime, Aniplex, TOHO "
+     "and more. What's airing now and what's coming next. No full-episode reposts."),
     # 🆕 2026-11-28 ニュースと音楽の棚を新設（検索語は無い。ニュースは en/sources.json の英語ニュース局の新着・
     #    音楽は日本の音楽カテゴリの急上昇）。Anime が先頭・既定タブのまま、その次に置く。
     ('jpnews', 'Japan News', None, None,

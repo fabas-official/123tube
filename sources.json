@@ -10,7 +10,12 @@
   "pages": 2,
   "tail_category": "25",
   "tail_hours": 48,
-  "ng_title": [],
+  "ng_title": [
+   "【ライブ】",
+   "【LIVE】",
+   "ライブ配信",
+   "まとめ配信"
+  ],
   "channels": [
    {
     "id": "UCGCZAYq5Xxojl_tSXcVJhiQ",
