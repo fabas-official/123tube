@@ -2487,7 +2487,10 @@ def hl_text(t, lang):
                 out.append(_rot(sd, 1, ['%d本のうち新顔は%d本です。' % (N, nc),
                                         '昨日の棚になかった動画が%d本入っています。' % nc,
                                         '新顔は%d本、%d本は昨日からの続きです。' % (nc, N - nc)]))
-        if f['dv']:
+        if f['dv'] and f['dv'].get('videoId') == top.get('videoId'):
+            # 1位の動画がいちばん伸びた動画でもある日は、題名をもう一度書かない（同じ長い題名が2文続けて並ぶと読みにくい）
+            out.append('この1位の動画が、前日からの伸びでも棚でいちばん（+%s回）です。' % format(f['dv']['delta'], ','))
+        elif f['dv']:
             D, d = _clip(f['dv'].get('title')), format(f['dv']['delta'], ',')
             out.append(_rot(sd, 2, ['前日からいちばん伸びたのは「%s」で+%s回です。' % (D, d),
                                     '前日比の伸びは「%s」が最大（+%s回）。' % (D, d),
@@ -2523,7 +2526,10 @@ def hl_text(t, lang):
             out.append(_rot(sd, 1, ['New today: %d of %d.' % (nc, N),
                                     '%d of the %d videos weren’t on this shelf yesterday.' % (nc, N),
                                     '%d new today; the other %d carry over from yesterday.' % (nc, N - nc)]))
-    if f['dv']:
+    if f['dv'] and f['dv'].get('videoId') == top.get('videoId'):
+        # Same video is No. 1 and the biggest gainer: don't repeat its title.
+        out.append('It is also the shelf’s biggest gainer since yesterday (+%s views).' % format(f['dv']['delta'], ','))
+    elif f['dv']:
         D, d = _clip(f['dv'].get('title')), format(f['dv']['delta'], ',')
         out.append(_rot(sd, 2, ['Biggest one-day gain: “%s”, up %s views since yesterday.' % (D, d),
                                 '“%s” climbed the most since yesterday (+%s views).' % (D, d),
