@@ -2410,8 +2410,11 @@ def main():
             chan = None
             if key not in ('trend', OWN_KEY) and source_cfg(key):
                 _hot = key in HOT_KEYS
+                # ニュース棚だけは「他のタブに先に出た動画」を1〜3位から外さない（2026-11-28 PM検証）。
+                # その日いちばん大きいニュースは総合（急上昇）にも載る。外すと、最大の話題が4位以下に落ちて
+                # 「今日のニュース」の1位が二番手の話題になる（実測: 問責決議案の140万回の動画が4・5位だった）。
                 _blk = set(vid for (k2, vid), s in prev_streak.items()
-                           if k2 == key and s >= TOP3_MAX_STREAK) | set(_used_ids)
+                           if k2 == key and s >= TOP3_MAX_STREAK) | (set() if key in NEWS_KEYS else set(_used_ids))
                 _tir = set(vid for vid, n in prev_shelf.get(key, {}).items()
                            if n >= (HOT_SHELF_MAX_DAYS if _hot else SHELF_MAX_DAYS))
                 try:
