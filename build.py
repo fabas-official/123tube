@@ -1408,21 +1408,38 @@ def channel_pool(cfg, since_hours, now):
     """設定の全チャンネルの新着を集めて hydrate する。1チャンネルが落ちても他で続ける
     （全部落ちた時だけ例外＝棚ごと前日分の引き継ぎになる）。縦動画・70秒以下・配信中/予定のライブは載せない。"""
     ids, seen, failed, per = [], set(), [], []
+    # 🆕 2026-11-28 チャンネルごとの条件（sources.json の各チャンネルに書ける・無ければ棚全体の設定のまま）:
+    #   require_title … そのチャンネルだけ、題名にこの語がある動画に絞る
+    #                   （例: 世界のニュースを出す通信社から日本の話題だけ／総合チャンネルからニュース枠だけ）
+    #   pages         … そのチャンネルだけ新着を何ページ読むか（1日に何十本も上げる通信社は多めに読まないと半日ぶんしか見えない）
+    need = {}                                       # 動画ID -> そのチャンネルの require_title（正規表現）
     for ch in cfg['channels']:
         try:
-            got = uploads_of(ch['id'], since_hours, now, int(cfg.get('pages', 2)))
+            got = uploads_of(ch['id'], since_hours, now, int(ch.get('pages', cfg.get('pages', 2))))
         except Exception as e:
             failed.append(ch.get('name', ch['id']))
             print('   └ チャンネル取得失敗 %s: %s' % (ch.get('name', ch['id']), str(e)[:80]))
             continue
         per.append('%s=%d' % (ch.get('name', ch['id'])[:10], len(got)))
+        try:
+            rq = re.compile(ch['require_title'], re.I) if ch.get('require_title') else None
+        except re.error as e:
+            # 設定の書き間違いで棚ごと落とさない（条件なしで通すと関係ない動画が並ぶので、そのチャンネルは今回載せない）
+            print('   └ require_title の書式エラー %s: %s → このチャンネルは今回載せない' % (ch.get('name', ch['id']), e))
+            continue
         for i in got:
             if i not in seen:
                 seen.add(i)
                 ids.append(i)
+                if rq:
+                    need[i] = rq
     if not ids and failed:
         raise RuntimeError('全チャンネルの取得に失敗（%d件）' % len(failed))
     vids = hydrate(ids) if ids else []
+    if need:
+        n_before = len(vids)
+        vids = [v for v in vids if v['videoId'] not in need or need[v['videoId']].search(v.get('title', ''))]
+        print('   └ チャンネルごとの題名条件で %d本 → %d本' % (n_before, len(vids)))
     n0 = len(vids)
     vids = [v for v in vids if v.get('_secs', 0) > SHORTS_MAX_SEC and not v.get('live')]
     print('   └ チャンネル%d本（失敗%d）から新着%d本 → 70秒超・ライブ除外後%d本 [%s]'

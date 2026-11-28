@@ -1,7 +1,7 @@
 {
  "_note": "英語版（Japan Buzz）の発信元。コードを触らずにチャンネルを足せる（id は channels.list で照合済みのものだけ）。2026-11-28 PM設計。",
  "jpnews": {
-  "how_source": "English-language newsrooms in Japan",
+  "how_source": "English-language newsrooms covering Japan",
   "top3_hours": 36,
   "max_hours": 72,
   "fill_hours": 240,
@@ -21,7 +21,9 @@
   "channels": [
    {
     "id": "UCSPEjw8F2nQDtmUKPFNF7_A",
-    "name": "NHK WORLD-JAPAN"
+    "name": "NHK WORLD-JAPAN",
+    "require_title": "NHK WORLD-JAPAN NEWS|NEWSLINE",
+    "pages": 3
    },
    {
     "id": "UCJD2Br_xC-3vY4nkJ9YPYDA",
@@ -38,8 +40,45 @@
    {
     "id": "UCVUuzqkjtF29vAyLgu10htg",
     "name": "Japan Forward"
+   },
+   {
+    "id": "UChqUTb7kYRX8-EiaN3XFrSQ",
+    "name": "Reuters",
+    "require_title": "\\bJapan(ese)?\\b|Tokyo|Osaka|Okinawa|Takaichi|\\bBOJ\\b",
+    "pages": 3
+   },
+   {
+    "id": "UC52X5wxOL_s5yw0dQk7NtgA",
+    "name": "Associated Press",
+    "require_title": "\\bJapan(ese)?\\b|Tokyo|Osaka|Okinawa|Takaichi|\\bBOJ\\b",
+    "pages": 3
+   },
+   {
+    "id": "UCknLrEdhRCp1aegoMqRaCZg",
+    "name": "DW News",
+    "require_title": "\\bJapan(ese)?\\b|Tokyo|Osaka|Okinawa|Takaichi|\\bBOJ\\b",
+    "pages": 3
+   },
+   {
+    "id": "UC83jt4dlz1Gjl58fzQrrKZg",
+    "name": "CNA",
+    "require_title": "\\bJapan(ese)?\\b|Tokyo|Osaka|Okinawa|Takaichi|\\bBOJ\\b",
+    "pages": 3
+   },
+   {
+    "id": "UC4SUWizzKc1tptprBkWjX2Q",
+    "name": "South China Morning Post",
+    "require_title": "\\bJapan(ese)?\\b|Tokyo|Osaka|Okinawa|Takaichi|\\bBOJ\\b",
+    "pages": 2
+   },
+   {
+    "id": "UCg5HQ8yI3f43ogvFJyVMfhQ",
+    "name": "Nikkei Asia",
+    "require_title": "\\bJapan(ese)?\\b|Tokyo|Osaka|Okinawa|Takaichi|\\bBOJ\\b",
+    "pages": 1
    }
-  ]
+  ],
+  "_note": "2026-11-28 夜: 日本の英語報道だけでは新着が少なく、ベスト3に4日前の動画が残った → 海外の報道機関を足し、題名に日本の語がある動画だけ載せる（チャンネルごとの require_title）。NHK は総合チャンネルなのでニュース枠だけ。"
  },
  "anime": {
   "how_source": "official anime channels",

@@ -11,9 +11,17 @@ name: daily-build
 #        ・それ以外 → 何もしない（何も書かない・commit も無い）
 #    分は :00 を避けている（毎時0分は混雑で遅れやすい）。
 # workflow_dispatch を付けてあるので、手動実行ボタンからいつでも即時のフルビルドができる（FORCE=1）。
+# 🆕 2026-11-28 夜: 30分おきの指定でも、GitHub の schedule はこのリポジトリではほとんど発火しなかった
+#    （実測: 13:22 に設定を入れてから 22:00 までの17枠で、発火は 21:27 の1回だけ）。
+#    → 内田さんのPCの定時タスク（scripts/pm_123tube_poke.py・20分おき）が「今、更新が要るか」を公開面の時刻で判断し、
+#      要る時だけ repository_dispatch（合図）を送る。作るのは今までどおり GitHub 側＝PCは合図を送るだけ。
+#      PCが落ちている間は下の schedule が予備として残る（遅れても、04:00 を過ぎて最初に発火した回がその日のフルビルド）。
+#    合図の中身（client_payload）: 何も無し＝plan_run() が決める ／ mode=news＝ニュースの棚だけ今すぐ ／ force=true＝今すぐフルビルド
 on:
   schedule:
     - cron: '17,47 * * * *'
+  repository_dispatch:
+    types: [poke]
   workflow_dispatch:
 
 # index.html / data.json を書き戻すため書き込み権限が要る
@@ -39,8 +47,8 @@ jobs:
       - name: Build site (JP)
         env:
           YT_API_KEY: ${{ secrets.YT_API_KEY }}
-          FORCE: ${{ github.event_name == 'workflow_dispatch' && '1' || '' }}
-        run: python build.py
+          FORCE: ${{ (github.event_name == 'workflow_dispatch' || github.event.client_payload.force == true) && '1' || '' }}
+        run: python build.py ${{ github.event.client_payload.mode == 'news' && '--news-only' || '' }}
 
       # 🇺🇸 英語版「Japan Buzz」（2026-09-03 追加）。同じジョブの中でJP版の直後に続けて走らせる
       # （ワークフローもキーもJP版と共有。同一GCPプロジェクトの同じ日次枠を消費するだけで新規契約は無い）。
@@ -51,8 +59,8 @@ jobs:
         if: always()
         env:
           YT_API_KEY: ${{ secrets.YT_API_KEY }}
-          FORCE: ${{ github.event_name == 'workflow_dispatch' && '1' || '' }}
-        run: python build.py --edition en
+          FORCE: ${{ (github.event_name == 'workflow_dispatch' || github.event.client_payload.force == true) && '1' || '' }}
+        run: python build.py --edition en ${{ github.event.client_payload.mode == 'news' && '--news-only' || '' }}
 
       # 差分が無い回は commit しない（空コミットでヒストリを汚さない）。JP/EN 両方のファイルをまとめて1コミット。
       # if: always() で片方のビルドが失敗しても、もう片方が更新できていればそのファイルだけでも反映する。
