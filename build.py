@@ -24,7 +24,7 @@ YouTube API Services 規約の遵守点:
      ここが先に尽きると chart=mostPopular は通るのに search だけ429になる。
      期間指定の補完は FALLBACK_MAX 件までに制限してこれを守る。
 """
-import json, os, re, sys, html, datetime, urllib.parse, urllib.request
+import json, os, re, sys, html, datetime, urllib.parse, urllib.request, zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 API_KEY = os.environ.get('YT_API_KEY', '').strip()
@@ -2025,7 +2025,7 @@ def today_pane(t, on):
         newline = '<p class="newline"><span class="flat">きょうは昨日と同じ顔ぶれです</span></p>'
     head = ('<div class="lead"><span class="lbadge">今日</span>'
             '<h2>' + html.escape(t['label']) + ' ベスト3</h2>'
-            '<p>' + html.escape(t['note']) + how + stale + '</p>' + newline + '</div>')
+            '<p>' + html.escape(t['note']) + how + stale + '</p>' + _hl_html(t, 'ja') + newline + '</div>')
     return pane('p-today-' + t['key'], on,
                 head + pin + '<div class="top3">' + ''.join(card(v) for v in vids[:3]) + '</div>' + rest)
 
@@ -2145,6 +2145,8 @@ def render(d, hofc):
 
     body = nav + '<div class="panes">' + ''.join(panes) + '</div>'
     tpl = open(os.path.join(HERE, 'template.html'), encoding='utf-8').read()
+    # 🆕 日別ページを先に作り直し、その結果(直近7日のリンク)を本体のフッター上へ入れる。失敗しても本体は出す
+    tpl = tpl.replace('__PAST__', _day_pass(d, 'ja'))
     # フッターの説明文は定数から埋める。文言と実装が食い違うと「表示の嘘」になる
     # （2026-09-02 まで「直近90日」「1日2ジャンル」と、とっくに変わった数字が残っていた）。
     hof_cycle = -(-len(THEMES) // max(1, HOF_PER_RUN))
@@ -2184,6 +2186,13 @@ def render(d, hofc):
 def write_sitemap():
     """lastmod を当日に更新する。毎日更新されるサイトだと検索エンジンに伝えるため、
     ここが古いままだとクロール頻度が落ちる。"""
+    if EDITION != 'en':
+        # 🆕 ルートの sitemap.xml は日別ページも含めて、置いてあるファイルから作る（日別ページの無い日は従来と同じ1URL）
+        try:
+            write_root_sitemap()
+            return
+        except Exception as e:
+            print('NG ルートsitemap: %s（従来の1URLで書く）' % repr(e)[:100])
     today = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=9)).strftime('%Y-%m-%d')
     xml = ('<?xml version="1.0" encoding="UTF-8"?>\n'
            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
@@ -2302,7 +2311,7 @@ def theme_pane_en(t, on):
         newline = '<p class="newline"><span class="flat">Same lineup as yesterday.</span></p>'
     head = ('<div class="lead"><span class="lbadge">TODAY</span>'
             '<h2>' + html.escape(t['label']) + ' — Top 3</h2>'
-            '<p>' + html.escape(t['note']) + how + stale + '</p>' + newline + '</div>')
+            '<p>' + html.escape(t['note']) + how + stale + '</p>' + (_hl_html(t, 'en') if t.get('key') != OWN_KEY else '') + newline + '</div>')
     return pane('p-' + t['key'], on,
                 head + pin + '<div class="top3">' + ''.join(card_en(v, strip) for v in vids[:3]) + '</div>' + rest)
 
@@ -2335,6 +2344,7 @@ def render_en(d):
     panes = [theme_pane_en(themes[k], k == default_key) for k, _l in genres]
     body = nav + '<div class="panes">' + ''.join(panes) + '</div>'
     tpl = open(TEMPLATE_FILE, encoding='utf-8').read()
+    tpl = tpl.replace('__PAST__', _day_pass(d, 'en'))      # 日別ページ(en/d/)を先に作り直す。失敗しても本体は出す
     _known = [t for t in d['themes'] if t.get('new_count') is not None]
     try:
         _u = datetime.datetime.strptime(d['updated'][:16], '%Y-%m-%d %H:%M')
@@ -2360,6 +2370,572 @@ def render_en(d):
         os.fsync(f.fileno())
     os.replace(INDEX + '.tmp', INDEX)
     return len(out.encode('utf-8'))
+
+
+# ---------------------------------------------------------------- 日別ページ・今日の見どころ（2026-11-28 追加）
+# 🆕 なぜ作るか: Search Console が「クロール済み - インデックス未登録」（8月末から・Google に載っているページ0件）。
+#    原因は「他人の動画の題名と画像が並んだ1ページ」だけで、自前の文章がほぼ無いこと。
+#    (A) 各棚に台帳の事実だけで組んだ2〜4文の「今日の見どころ」を足し、
+#    (B) 毎日1枚ずつ残る日別ページ(d/YYYY-MM-DD.html)を足して、日ごとに違う中身のページを増やす。
+#    ⚠️ API は1回も呼ばない（今ある台帳 data.json から描くだけ）。
+#    ⚠️ 日別ページの失敗で本体(index.html)の更新を止めない（_day_pass は例外を握って print する）。
+#    ⚠️ API データの保存は30日まで（規約）＝ DAY_KEEP_DAYS 以上前の日別ページはビルドのたびに消す。
+DAY_KEEP_DAYS = 30                       # 日別ページを置く日数（当日を含む）。これ以上古いページは消す（置くのは30枚まで）
+SITE_ROOT = 'https://fabas-official.github.io/123tube/'   # SITE_URL は EN 版で書き換わるので別に持つ
+_DAY_FILE = re.compile(r'^(\d{4})-(\d{2})-(\d{2})\.html$')
+_WD_JA = '月火水木金土日'
+_MON_EN = ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec')
+
+
+def _clip(s, n=60):
+    """題名を n 文字で切って「…」（見どころ・日別ページ共通）。"""
+    s = (s or '').strip()
+    return s if len(s) <= n else s[:n].rstrip() + '…'
+
+
+def _seed(key, date):
+    """日付と棚キーから決まる番号。乱数は使わない＝同じ日に作り直しても同じ文になる。"""
+    return zlib.crc32((date + '/' + key).encode('utf-8'))
+
+
+def _rot(seed, slot, variants, ok=None):
+    """variants から seed で1つ選ぶ。ok(v) が偽（材料が足りない型）なら次の型へ回す。全部ダメなら None。"""
+    n = len(variants)
+    start = (seed >> (slot * 4)) % n
+    for i in range(n):
+        v = variants[(start + i) % n]
+        if ok is None or ok(v):
+            return v
+    return None
+
+
+def _date_of(s):
+    try:
+        y, m, d = [int(x) for x in (s or '')[:10].split('-')]
+        return datetime.date(y, m, d)
+    except Exception:
+        return None
+
+
+def _age(v, ref_utc, ref_date):
+    """公開からの経過。48時間未満で pubTs があれば時間、無ければ日数（年）。測れなければ None。
+    基準は棚を作った時刻(asof)＝再描画しても同じ数字になる。"""
+    h = hours_since(v, ref_utc) if ref_utc else None
+    if h is not None and h < 48:
+        return ('h', max(1, int(h)))
+    p = _date_of(v.get('publishedAt'))
+    if p is None or ref_date is None:
+        return None
+    days = max(1, (ref_date - p).days)
+    return ('y', round(days / 365.0, 1)) if days >= 365 else ('d', days)
+
+
+def _shelf_facts(t):
+    """見どころに使ってよい材料だけを台帳から取り出す。推測は入れない。"""
+    vids = [v for v in (t.get('videos') or []) if isinstance(v, dict) and v.get('videoId')]
+    if not vids:
+        return None
+    ref_utc = _jst_to_utc(t.get('asof'))
+    ref_date = _date_of(t.get('asof'))
+    f = {'vids': vids, 'N': len(vids), 'top': vids[0], 'nc': t.get('new_count'),
+         'age': _age(vids[0], ref_utc, ref_date), 'chs': len(set(v.get('channelTitle') for v in vids))}
+    ds = [v for v in vids if isinstance(v.get('delta'), int) and v['delta'] > 0]
+    f['dv'] = max(ds, key=lambda v: v['delta']) if ds else None            # 前日比がいちばん大きい動画
+    f['mv'] = max(vids, key=lambda v: v.get('views') or 0)                   # 再生数がいちばん多い動画
+    pubs = [_date_of(v.get('publishedAt')) for v in vids[:3]]
+    f['pubs'] = pubs if len(pubs) == 3 and all(pubs) else None               # ベスト3の公開日
+    return f
+
+
+def hl_text(t, lang):
+    """棚ごとの「今日の見どころ」2〜4文。文の型は棚キー＋日付で決まる番号で選ぶ（lang='ja'|'en'）。
+    材料が無い項目（前日比が全部 None・新顔数が無い等）は、その文を出さない（「不明」とは書かない）。"""
+    f = _shelf_facts(t)
+    if not f:
+        return ''
+    date = (t.get('asof') or '')[:10]
+    sd = _seed(t.get('key', ''), date)
+    top, N = f['top'], f['N']
+    T = _clip(top.get('title'))
+    CH = top.get('channelTitle') or ''
+    out = []
+    a = f['age']
+    nc = f['nc']
+    pb = f['pubs']
+
+    def ok4(i):                       # 4文目の型: 0=チャンネル数 1=再生数最多（1位と別の時だけ） 2=ベスト3の公開日
+        return not (i == 1 and f['mv']['videoId'] == top['videoId']) and not (i == 2 and not pb)
+
+    if lang == 'ja':
+        V = big(top.get('views') or 0)
+        if a:
+            u = {'h': ('%d時間', '%d時間前'), 'd': ('%d日', '%d日前'), 'y': ('%s年', '%s年前')}[a[0]]
+            since, ago = '公開から' + (u[0] % a[1]), u[1] % a[1]
+            out.append(_rot(sd, 0, [
+                '1位は「%s」（%s）。%sで%sを集めています。' % (T, CH, since, V),
+                'いちばん上にあるのは%sの「%s」で、%sで%sです。' % (CH, T, since, V),
+                '先頭は「%s」。%sが%sに公開し、再生は%sです。' % (T, CH, ago, V)]))
+        else:
+            out.append(_rot(sd, 0, ['1位は「%s」（%s）で、再生数は%sです。' % (T, CH, V),
+                                    'いちばん上にあるのは%sの「%s」。再生数は%sです。' % (CH, T, V)]))
+        if isinstance(nc, int):
+            if nc == 0:
+                out.append('昨日と同じ顔ぶれです。')
+            elif nc >= N:
+                out.append(_rot(sd, 1, ['%d本すべてが新顔です。' % N, '昨日の棚になかった動画が%d本、全部入れ替わりました。' % N]))
+            else:
+                out.append(_rot(sd, 1, ['%d本のうち新顔は%d本です。' % (N, nc),
+                                        '昨日の棚になかった動画が%d本入っています。' % nc,
+                                        '新顔は%d本、%d本は昨日からの続きです。' % (nc, N - nc)]))
+        if f['dv']:
+            D, d = _clip(f['dv'].get('title')), format(f['dv']['delta'], ',')
+            out.append(_rot(sd, 2, ['前日からいちばん伸びたのは「%s」で+%s回です。' % (D, d),
+                                    '前日比の伸びは「%s」が最大（+%s回）。' % (D, d),
+                                    '「%s」が前日から+%s回と、この棚でいちばん伸びました。' % (D, d)]))
+        s4 = [('%d本は%dチャンネルにまたがっています。' % (N, f['chs'])) if f['chs'] < N else ('%d本すべてが別のチャンネルです。' % N),
+              '再生数がいちばん多いのは「%s」の%sです。' % (_clip(f['mv'].get('title')), big(f['mv'].get('views') or 0)),
+              ('ベスト3の公開日は%s・%s・%sです。' % tuple('%d/%d' % (p.month, p.day) for p in pb)) if pb else '']
+        i4 = _rot(sd, 3, [0, 1, 2], ok4)
+        if i4 is not None:
+            out.append(s4[i4])
+        return ''.join(out)
+    # ---- English
+    V = big_en(top.get('views') or 0)
+
+    def pl(n, w):
+        return '%s %s%s' % (n, w, '' if n == 1 else 's')
+    if a:
+        span = pl(a[1], 'hour') if a[0] == 'h' else (pl(a[1], 'day') if a[0] == 'd' else '%s years' % a[1])
+        ago = span + ' ago'
+        out.append(_rot(sd, 0, [
+            'No. 1 is “%s” by %s, at %s after %s.' % (T, CH, V, span),
+            '%s holds the top spot with “%s”: %s, published %s.' % (CH, T, V, ago),
+            'Leading the shelf: “%s” (%s) — %s, published %s.' % (T, CH, V, ago)]))
+    else:
+        out.append(_rot(sd, 0, ['No. 1 is “%s” by %s, at %s.' % (T, CH, V),
+                                '%s holds the top spot with “%s” at %s.' % (CH, T, V)]))
+    if isinstance(nc, int):
+        if nc == 0:
+            out.append('Same lineup as yesterday.')
+        elif nc >= N:
+            out.append('Every one of the %d is new today.' % N)
+        else:
+            out.append(_rot(sd, 1, ['New today: %d of %d.' % (nc, N),
+                                    '%d of the %d videos weren’t on this shelf yesterday.' % (nc, N),
+                                    '%d new today; the other %d carry over from yesterday.' % (nc, N - nc)]))
+    if f['dv']:
+        D, d = _clip(f['dv'].get('title')), format(f['dv']['delta'], ',')
+        out.append(_rot(sd, 2, ['Biggest one-day gain: “%s”, up %s views since yesterday.' % (D, d),
+                                '“%s” climbed the most since yesterday (+%s views).' % (D, d),
+                                '“%s” added %s views since yesterday, more than any other video here.' % (D, d)]))
+    if f['chs'] <= 1:
+        c0 = 'The videos all come from one channel.'
+    elif f['chs'] >= N:
+        c0 = 'All %d videos are from different channels.' % N
+    else:
+        c0 = 'The %d videos come from %d different channels.' % (N, f['chs'])
+    s4 = [c0, 'Most viewed on the shelf: “%s” at %s.' % (_clip(f['mv'].get('title')), big_en(f['mv'].get('views') or 0)),
+          ('The top three were published %s, %s and %s.' % tuple('%s %d' % (_MON_EN[p.month - 1], p.day) for p in pb)) if pb else '']
+    i4 = _rot(sd, 3, [0, 1, 2], ok4)
+    if i4 is not None:
+        out.append(s4[i4])
+    return ' '.join(out)
+
+
+def _hl_html(t, lang):
+    """本体の棚の見出しに入れる <p class="hl">。失敗しても棚は出す（空文字を返す）。"""
+    try:
+        s = hl_text(t, lang)
+        return ('<p class="hl">' + html.escape(s) + '</p>') if s else ''
+    except Exception as e:
+        print('NG 今日の見どころ(%s %s): %s' % (lang, t.get('key'), repr(e)[:120]))
+        return ''
+
+
+# ---- 日別ページ本体
+
+def _day_dir(lang):
+    return os.path.join(HERE, 'en', 'd') if lang == 'en' else os.path.join(HERE, 'd')
+
+
+def _day_files(lang):
+    """置いてある日別ページの日付(date)を古い順で返す（index.html は含めない）。"""
+    d = _day_dir(lang)
+    out = []
+    if os.path.isdir(d):
+        for fn in os.listdir(d):
+            m = _DAY_FILE.match(fn)
+            if m:
+                try:
+                    out.append(datetime.date(int(m.group(1)), int(m.group(2)), int(m.group(3))))
+                except ValueError:
+                    pass
+    return sorted(out)
+
+
+def _write_text(path, text):
+    """tmp に書いてから置き換える（途中で落ちても壊れたページを残さない）。LF 固定＝差分を汚さない。"""
+    with open(path + '.tmp', 'w', encoding='utf-8', newline='\n') as f:
+        f.write(text)
+    os.replace(path + '.tmp', path)
+
+
+def _day_purge(lang):
+    """DAY_KEEP_DAYS 以上前の日別ページを消す。判定はファイル名の日付と実時計(JST)。消した本数を返す。"""
+    today = _now_jst().date()
+    n = 0
+    for dt in _day_files(lang):
+        if (today - dt).days >= DAY_KEEP_DAYS:
+            try:
+                os.remove(os.path.join(_day_dir(lang), dt.isoformat() + '.html'))
+                n += 1
+            except OSError as e:
+                print('NG 日別ページの削除(%s %s): %s' % (lang, dt, e))
+    return n
+
+
+def _fmt_day(dt, lang, short=False):
+    if lang == 'en':
+        return ('%s %d' % (_MON_EN[dt.month - 1], dt.day)) if short else '%s %d, %d' % (_MON_EN[dt.month - 1], dt.day, dt.year)
+    if short:
+        return '%d/%d(%s)' % (dt.month, dt.day, _WD_JA[dt.weekday()])
+    return '%d年%d月%d日（%s）' % (dt.year, dt.month, dt.day, _WD_JA[dt.weekday()])
+
+
+def _subst(tpl, vals):
+    """__KEY__ を1回の走査で置き換える。題名の中に __X__ があっても二重に置換されない。"""
+    return re.sub(r'__([A-Z]+)__', lambda m: vals.get(m.group(1), m.group(0)), tpl)
+
+
+def _day_shelves(d, lang):
+    """日別ページに載せる棚を (key, label, theme) の並びで返す。本体のタブ順に合わせる。殿堂入りは載せない。"""
+    themes = {t['key']: t for t in d.get('themes', [])}
+    if lang == 'en':
+        order = [(k, l) for k, l, _q, _dur, _n in THEMES] + [('jptrend', 'Trending in Japan')]
+        order = [(k, themes[k].get('label') or l) for k, l in order if k in themes]
+    else:
+        order = ([('trend', '総合')] if 'trend' in themes else []) + [(k, l) for (k, l, _q, _dur, _n) in THEMES if k in themes]
+    own = [(OWN_KEY, OWN_LABEL)] if OWN_KEY in themes else []
+    return [(k, l, themes[k]) for k, l in order + own if themes[k].get('videos')]
+
+
+_day_ref = (None, None)       # _row_day が使う「公開からの時間」の基準（棚ごとに _day_page が差し替える）
+
+
+def _row_day(v, i, lang):
+    """日別ページの1行。1〜3位だけサムネイル（width/height 指定・lazy）。"""
+    t0 = _clip(v['title'], 90)
+    url = 'https://www.youtube.com/watch?v=' + html.escape(v['videoId'])
+    a = _age(v, _day_ref[0], _day_ref[1])
+    if lang == 'en':
+        pub = ('published %d hour%s ago' % (a[1], '' if a[1] == 1 else 's')) if a and a[0] == 'h' else 'published ' + (v.get('publishedAt') or '')
+        meta = '%s ｜ %s ｜ %s' % (v.get('channelTitle') or '', big_en(v.get('views') or 0), pub)
+    else:
+        pub = ('公開から%d時間' % a[1]) if a and a[0] == 'h' else '公開 ' + (v.get('publishedAt') or '')
+        meta = '%s ｜ %s ｜ %s' % (v.get('channelTitle') or '', big(v.get('views') or 0), pub)
+    th = ('<a class="th" href="' + url + '" target="_blank" rel="noopener"><img loading="lazy" width="320" height="180" src="' +
+          html.escape(v.get('thumb') or '') + '" alt="' + html.escape(t0) + '"></a>') if i <= 3 else ''
+    return ('<li class="' + ('top' if i <= 3 else 'rest') + '"><span class="n">' + str(i) + '</span>' + th +
+            '<div class="tx"><a class="tt" href="' + url + '" target="_blank" rel="noopener">' + html.escape(t0) + '</a>'
+            '<p class="mt">' + html.escape(meta) + '</p></div></li>')
+
+
+def _row_day_small(v, i, lang):
+    """うっちーPの歌は末尾に小さく（サムネ無し・先頭のハッシュタグ群は表示だけ落とす）。"""
+    t0 = _clip(strip_lead_tags(v['title']), 90)
+    url = 'https://www.youtube.com/watch?v=' + html.escape(v['videoId'])
+    meta = (big_en(v.get('views') or 0) if lang == 'en' else big(v.get('views') or 0))
+    return ('<li class="rest"><span class="n">' + str(i) + '</span><div class="tx"><a class="tt" href="' + url +
+            '" target="_blank" rel="noopener">' + html.escape(t0) + '</a><p class="mt">' + html.escape(meta) + '</p></div></li>')
+
+
+def _nav_parts(prv, nxt, lang):
+    """前の日/次の日/一覧。前後はファイルが実在する日だけ。<!--PREV--><!--NEXT--> は隣の日のページから書き換える目印。"""
+    if lang == 'en':
+        p = ('<a href="%s.html">← Previous day (%s)</a>' % (prv.isoformat(), _fmt_day(prv, 'en', True))) if prv else ''
+        n = ('<a href="%s.html">Next day (%s) →</a>' % (nxt.isoformat(), _fmt_day(nxt, 'en', True))) if nxt else ''
+        idx = '<a href="index.html">All dates</a>'
+    else:
+        p = ('<a href="%s.html">← 前の日（%s）</a>' % (prv.isoformat(), _fmt_day(prv, 'ja', True))) if prv else ''
+        n = ('<a href="%s.html">次の日（%s） →</a>' % (nxt.isoformat(), _fmt_day(nxt, 'ja', True))) if nxt else ''
+        idx = '<a href="index.html">日付の一覧</a>'
+    return ('<nav class="pn"><span><!--PREV-->' + p + '<!--/PREV--></span>' + idx +
+            '<span><!--NEXT-->' + n + '<!--/NEXT--></span></nav>')
+
+
+def _nav_html(dates, dt, lang):
+    prv = max([x for x in dates if x < dt], default=None)
+    nxt = min([x for x in dates if x > dt], default=None)
+    return _nav_parts(prv, nxt, lang)
+
+
+def _patch_nav(path, prv, nxt, lang):
+    """隣の日のページの前後リンクだけを書き換える（目印が無い古い形のページは何もしない）。"""
+    try:
+        s = open(path, encoding='utf-8').read()
+        if '<!--PREV-->' not in s or '<!--NEXT-->' not in s:
+            return
+        new = _nav_parts(prv, nxt, lang)
+        pvh = re.search(r'<!--PREV-->(.*?)<!--/PREV-->', new, re.S).group(1)
+        nxh = re.search(r'<!--NEXT-->(.*?)<!--/NEXT-->', new, re.S).group(1)
+        s2 = re.sub(r'<!--PREV-->.*?<!--/PREV-->', lambda m: '<!--PREV-->' + pvh + '<!--/PREV-->', s, flags=re.S)
+        s2 = re.sub(r'<!--NEXT-->.*?<!--/NEXT-->', lambda m: '<!--NEXT-->' + nxh + '<!--/NEXT-->', s2, flags=re.S)
+        if s2 != s:
+            _write_text(path, s2)
+    except Exception as e:
+        print('NG 日別ページの前後リンク更新 %s: %s' % (path, repr(e)[:100]))
+
+
+def _alt_links(rel, lang):
+    """hreflang。相手側の同じファイルが実在する時だけ張る（無いものに張ると404を指す）。rel は 日付.html か index.html。"""
+    other = 'ja' if lang == 'en' else 'en'
+    ex = os.path.exists(os.path.join(_day_dir(other), rel))
+    ja_u, en_u = SITE_ROOT + 'd/' + rel, SITE_ROOT + 'en/d/' + rel
+    s = '<link rel="alternate" hreflang="%s" href="%s">' % (lang, en_u if lang == 'en' else ja_u)
+    if ex:
+        s += '\n<link rel="alternate" hreflang="%s" href="%s">' % (other, en_u if other == 'en' else ja_u)
+        s += '\n<link rel="alternate" hreflang="x-default" href="%s">' % ja_u
+    return s
+
+
+def _fit_desc(build, tails, hi=160):
+    """説明文を hi 字以下に収める。まず定型の締め文を長いまま・題名を縮めながら試し、
+    それでも入らなければ締め文を短くする（文の途中で切らない）。"""
+    s = ''
+    for tail in tails:
+        for lim in (40, 30, 24, 18, 12, 8):
+            s = build(lim, tail)
+            if len(s) <= hi:
+                return s
+    return s[:hi - 1] + '…'
+
+
+def _refresh_alt(lang, rel):
+    """相手側の同じ日のページができた時、すでにあるこちら側のページの hreflang を張り直す（JP→EN の順に作るため、
+    先に出来た側は相手の存在を知らない。hreflang は相互に張られていないと検索エンジンに無視される）。"""
+    try:
+        p = os.path.join(_day_dir(lang), rel)
+        if not os.path.exists(p):
+            return
+        s = open(p, encoding='utf-8').read()
+        s2 = re.sub(r'(?:<link rel="alternate" hreflang="[^"]*" href="[^"]*">\n?)+',
+                    lambda m: _alt_links(rel, lang) + '\n', s, count=1)
+        if s2 != s:
+            _write_text(p, s2)
+    except Exception as e:
+        print('NG hreflang の張り直し(%s %s): %s' % (lang, rel, repr(e)[:100]))
+
+
+def _day_page(d, lang, dt, dates):
+    """その日の日別ページ(HTML文字列)と description を返す。"""
+    global _day_ref
+    shelves = _day_shelves(d, lang)
+    if not shelves:
+        raise ValueError('棚が無い')
+    tkey, nkey = ('jptrend', 'jpnews') if lang == 'en' else ('trend', 'news')
+    by = {k: t for k, _l, t in shelves}
+    tt = by[tkey]['videos'][0] if tkey in by else None
+    nt = by[nkey]['videos'][0] if nkey in by else None
+    first = shelves[0][2]['videos'][0]
+    genres = [s for s in shelves if s[0] not in (OWN_KEY, tkey)]
+    known = [t for _k, _l, t in shelves if t.get('new_count') is not None and _k != OWN_KEY]
+    newtot = sum(t['new_count'] for t in known) if known else None
+    dl = _fmt_day(dt, lang)
+    if lang == 'en':
+        title = 'Japan’s YouTube video rankings for %s | Anime, News, J-Music & more - Japan Buzz' % dl
+
+        def mk(lim, tail):
+            s = 'Japan Buzz ranking for %s.' % dl
+            if tt:
+                s += ' Trending in Japan No. 1: “%s”.' % _clip(tt['title'], lim)
+            if nt:
+                s += ' Top Japan News video: “%s”.' % _clip(nt['title'], lim)
+            return s + tail
+        desc = _fit_desc(mk, (' Plus anime, J-Music, travel, food and cute clips, with views and publish times.',
+                              ' Plus anime, J-Music, travel and food.', ''))
+        h1 = 'Japan’s YouTube video rankings for %s' % dl
+        intro = []
+        if tt:
+            intro.append('Trending in Japan No. 1 is “%s” (%s, %s).' % (_clip(tt['title']), tt.get('channelTitle') or '', big_en(tt.get('views') or 0)))
+        if nt:
+            intro.append('The top Japan News video is “%s” (%s).' % (_clip(nt['title']), nt.get('channelTitle') or ''))
+        if newtot is not None:
+            intro.append('New across every genre today: %d.' % newtot)
+        intro = ' '.join(intro) or 'Rankings for the day, built from that day’s YouTube data.'
+        back = '<a class="back" href="../">← Today’s rankings (Japan Buzz)</a>'
+        sitename = 'Japan<span>Buzz</span>'
+    else:
+        title = '%sのYouTube動画ランキング｜ニュース・エンタメ・音楽ほか%dジャンル - 123Tube' % (dl, len(genres))
+
+        def mk(lim, tail):
+            s = '%sのYouTube動画ランキング。' % dl
+            if tt:
+                s += '総合1位は「%s」、' % _clip(tt['title'], lim)
+            if nt:
+                s += 'ニュース1位は「%s」。' % _clip(nt['title'], lim)
+            return s + tail
+        desc = _fit_desc(mk, ('エンタメ・音楽・ゲーム・アニメ・お金・恋愛など、ジャンルごとのベスト20を再生数と公開時間つきでまとめました。',
+                              'ジャンルごとのベスト20を再生数つきでまとめました。', ''))
+        h1 = '%sのYouTube動画ランキング' % dl
+        intro = []
+        if tt:
+            intro.append('この日の総合1位は「%s」（%s・%s）。' % (_clip(tt['title']), tt.get('channelTitle') or '', big(tt.get('views') or 0)))
+        if nt:
+            intro.append('ニュースの1位は「%s」（%s）でした。' % (_clip(nt['title']), nt.get('channelTitle') or ''))
+        if newtot is not None:
+            intro.append('全ジャンルの新顔は合計%d本です。' % newtot)
+        intro = ''.join(intro) or 'この日の台帳から作ったランキングの記録です。'
+        back = '<a class="back" href="../">← きょうのランキング（本体）</a>'
+        sitename = '123<span>Tube</span>'
+    jump, secs = [], []
+    for k, label, t in shelves:
+        _day_ref = (_jst_to_utc(t.get('asof')), _date_of(t.get('asof')))
+        own = (k == OWN_KEY)
+        vids = t['videos']
+        N = len(vids)
+        if lang == 'en':
+            h2 = label if own else ('%s: Top 3 and #4–#%d' % (label, N) if N > 3 else '%s: Top %d' % (label, N))
+        else:
+            h2 = label if own else ('%s ベスト3と4位〜%d位' % (label, N) if N > 3 else '%s ベスト%d' % (label, N))
+        hl = '' if own else _hl_html(t, lang)
+        lis = ''.join((_row_day_small(v, i, lang) if own else _row_day(v, i, lang)) for i, v in enumerate(vids, 1))
+        jump.append('<li><a href="#s-%s">%s</a></li>' % (k, html.escape(label)))
+        secs.append('<section id="s-%s"%s><h2>%s</h2>%s<ol class="rk">%s</ol></section>' % (
+            k, ' class="small own"' if own else '', html.escape(h2), hl, lis))
+    nav = _nav_html(dates, dt, lang)
+    body = ('<header>' + back + '<p class="logo" style="margin-top:12px">' + sitename + '</p></header><main><article>'
+            '<h1>' + html.escape(h1) + '</h1><p class="intro">' + html.escape(intro) + '</p>'
+            '<ul class="jump">' + ''.join(jump) + '</ul>' + nav + ''.join(secs) + nav + '</article></main>')
+    src = by.get(tkey) or shelves[0][2]
+    items = [{'@type': 'ListItem', 'position': i, 'name': _clip(v['title'], 100),
+              'url': 'https://www.youtube.com/watch?v=' + v['videoId']} for i, v in enumerate(src['videos'][:10], 1)]
+    jsonld = ('<script type="application/ld+json">' +
+              json.dumps({'@context': 'https://schema.org', '@type': 'ItemList', 'name': h1, 'numberOfItems': len(items),
+                          'itemListElement': items}, ensure_ascii=False).replace('</', '<\\/') + '</script>')
+    # 一覧(d/index.html)がこのページから読む記録。過去の data.json は残っていない（規約の30日）ので、ここが唯一の置き場
+    metas = ('<meta name="x-day-top" content="' + html.escape(_clip((tt or first)['title'], 80), quote=True) + '">\n'
+             '<meta name="x-day-news" content="' + html.escape(_clip(nt['title'], 80) if nt else '', quote=True) + '">')
+    name = dt.isoformat() + '.html'
+    me = SITE_ROOT + ('en/d/' if lang == 'en' else 'd/') + name
+    tpl = open(os.path.join(HERE, 'template_day_en.html' if lang == 'en' else 'template_day.html'), encoding='utf-8').read()
+    page = _subst(tpl, {'LANG': lang if lang == 'en' else 'ja', 'TITLE': html.escape(title), 'DESC': html.escape(desc, quote=True),
+                        'CANON': me, 'ALT': _alt_links(name, lang), 'OGIMG': SITE_ROOT + ('en/og.png' if lang == 'en' else 'og.png'),
+                        'METAS': metas, 'JSONLD': jsonld, 'BODY': body, 'UPD': html.escape(d.get('updated', ''))})
+    return page, desc
+
+
+def _read_day_meta(lang, dt):
+    try:
+        s = open(os.path.join(_day_dir(lang), dt.isoformat() + '.html'), encoding='utf-8').read()
+
+        def g(n):
+            m = re.search(r'<meta name="' + n + r'" content="([^"]*)">', s)
+            return html.unescape(m.group(1)) if m else ''
+        return g('x-day-top'), g('x-day-news')
+    except Exception:
+        return '', ''
+
+
+def _day_index(lang, d):
+    """日付の一覧(d/index.html)。置いてある日別ページを新しい順に（各ページの x-day-* メタを読む）。"""
+    dates = _day_files(lang)
+    if not dates:
+        return
+    rows = []
+    for dt in reversed(dates):
+        top, news = _read_day_meta(lang, dt)
+        p = []
+        if lang == 'en':
+            if top:
+                p.append('<p>Trending in Japan No. 1: ' + html.escape(top) + '</p>')
+            if news:
+                p.append('<p>Japan News No. 1: ' + html.escape(news) + '</p>')
+        else:
+            if top:
+                p.append('<p>総合1位: ' + html.escape(top) + '</p>')
+            if news:
+                p.append('<p>ニュース1位: ' + html.escape(news) + '</p>')
+        rows.append('<li><a class="dd" href="%s.html">%s</a>%s</li>' % (dt.isoformat(), _fmt_day(dt, lang), ''.join(p)))
+    if lang == 'en':
+        title, h1 = 'All dates — daily YouTube video rankings for Japan - Japan Buzz', 'Daily rankings: all dates'
+        desc = 'One page per day, kept for the last %d days: each day’s Trending in Japan and Japan News No. 1 and the full top lists for anime, J-Music, travel, food and more.' % DAY_KEEP_DAYS
+        back, site = '<a class="back" href="../">← Today’s rankings (Japan Buzz)</a>', 'Japan<span>Buzz</span>'
+        lead = 'Every day gets its own page, kept for the last %d days.' % DAY_KEEP_DAYS
+    else:
+        title, h1 = '日付の一覧｜毎日のYouTube動画ランキング - 123Tube', '毎日のランキング 日付の一覧'
+        desc = '毎日1枚ずつ残している日別ページの一覧です（直近%d日分）。その日の総合1位とニュース1位、ジャンルごとのベスト20を日付から探せます。' % DAY_KEEP_DAYS
+        back, site = '<a class="back" href="../">← きょうのランキング（本体）</a>', '123<span>Tube</span>'
+        lead = '1日に1枚、その日のランキングを残しています（直近%d日分）。' % DAY_KEEP_DAYS
+    me = SITE_ROOT + ('en/d/' if lang == 'en' else 'd/') + 'index.html'
+    body = ('<header>' + back + '<p class="logo" style="margin-top:12px">' + site + '</p></header><main><article>'
+            '<h1>' + html.escape(h1) + '</h1><p class="intro">' + html.escape(lead) + '</p><ul class="dl">' + ''.join(rows) + '</ul></article></main>')
+    tpl = open(os.path.join(HERE, 'template_day_en.html' if lang == 'en' else 'template_day.html'), encoding='utf-8').read()
+    page = _subst(tpl, {'LANG': 'en' if lang == 'en' else 'ja', 'TITLE': html.escape(title), 'DESC': html.escape(desc, quote=True),
+                        'CANON': me, 'ALT': _alt_links('index.html', lang), 'OGIMG': SITE_ROOT + ('en/og.png' if lang == 'en' else 'og.png'),
+                        'METAS': '', 'JSONLD': '', 'BODY': body, 'UPD': html.escape(d.get('updated', ''))})
+    _write_text(os.path.join(_day_dir(lang), 'index.html'), page)
+
+
+def _past_block(lang):
+    """本体ページのフッター上に出す「過去のランキング」（直近7日・ファイルがある日だけ）。無ければ空。"""
+    dates = _day_files(lang)
+    if not dates:
+        return ''
+    links = ' ／ '.join('<a href="d/%s.html">%s</a>' % (x.isoformat(), _fmt_day(x, lang, True)) for x in list(reversed(dates))[:7])
+    if lang == 'en':
+        return '<section class="past"><h2>Past rankings</h2><p>' + links + ' ／ <a href="d/index.html">All dates →</a></p></section>'
+    return '<section class="past"><h2>過去のランキング</h2><p>' + links + ' ／ <a href="d/index.html">日付の一覧 →</a></p></section>'
+
+
+def write_root_sitemap():
+    """ルートの sitemap.xml に本体(JP)・en/・日別ページ・一覧を全部載せる（置いてあるファイルから作る）。"""
+    today = _now_jst().strftime('%Y-%m-%d')
+    urls = [(SITE_ROOT, today, 'daily', '1.0'), (SITE_ROOT + 'en/', today, 'daily', '1.0')]
+    for lang, pre in (('ja', 'd/'), ('en', 'en/d/')):
+        dts = _day_files('en' if lang == 'en' else 'ja')
+        if not dts:
+            continue
+        urls.append((SITE_ROOT + pre + 'index.html', today, 'daily', '0.6'))
+        for dt in reversed(dts):
+            urls.append((SITE_ROOT + pre + dt.isoformat() + '.html', dt.isoformat(), 'never', '0.5'))
+    xml = ('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+           ''.join('  <url>\n    <loc>%s</loc>\n    <lastmod>%s</lastmod>\n    <changefreq>%s</changefreq>\n    <priority>%s</priority>\n  </url>\n' % u
+                   for u in urls) + '</urlset>\n')
+    _write_text(os.path.join(HERE, 'sitemap.xml'), xml)
+    return len(urls)
+
+
+def _day_pass(d, lang):
+    """日別ページ一式を作り直し、本体に出す「過去のランキング」のHTMLを返す。**絶対に例外を外へ出さない**
+    （日別ページが壊れても、本体の index.html の更新は止めない）。API は呼ばない。"""
+    past = ''
+    try:
+        dt = _date_of(d.get('updated'))
+        if dt is None:
+            raise ValueError('updated が読めない: %r' % d.get('updated'))
+        os.makedirs(_day_dir(lang), exist_ok=True)
+        removed = _day_purge(lang)
+        dates = sorted(set(_day_files(lang)) | {dt})
+        page, desc = _day_page(d, lang, dt, dates)
+        _write_text(os.path.join(_day_dir(lang), dt.isoformat() + '.html'), page)
+        i = dates.index(dt)
+        if i > 0:
+            _patch_nav(os.path.join(_day_dir(lang), dates[i - 1].isoformat() + '.html'), dates[i - 2] if i > 1 else None, dt, lang)
+        if i + 1 < len(dates):
+            _patch_nav(os.path.join(_day_dir(lang), dates[i + 1].isoformat() + '.html'), dt, dates[i + 2] if i + 2 < len(dates) else None, lang)
+        _day_index(lang, d)
+        _refresh_alt('ja' if lang == 'en' else 'en', dt.isoformat() + '.html')     # 相手側にも今できた hreflang を張る（相互でないと無効）
+        _refresh_alt('ja' if lang == 'en' else 'en', 'index.html')
+        n = write_root_sitemap()
+        print('DAY-PAGES(%s) %s bytes=%d desc=%d字 置いてある日=%d 削除=%d sitemap=%dURL' % (
+            lang, dt.isoformat(), len(page.encode('utf-8')), len(desc), len(dates), removed, n))
+    except Exception as e:
+        print('NG 日別ページ(%s): %s（本体の更新は続ける）' % (lang, repr(e)[:200]))
+    try:
+        past = _past_block(lang)
+    except Exception as e:
+        print('NG 過去のランキング(%s): %s' % (lang, repr(e)[:120]))
+    return past
 
 
 # ---------------------------------------------------------------- main

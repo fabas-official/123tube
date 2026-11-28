@@ -217,6 +217,12 @@ footer a{color:var(--ac);font-weight:700}
   .pane.on>.top3{order:1}
   .lead p:not(.newline){order:2;text-align:center;margin:14px auto 6px}
 }
+/* 🆕 2026-11-28 今日の見どころ(.hl)と、フッター上の「過去のランキング」(.past)。本体の見た目は他は変えない */
+.lead p.hl{margin-top:10px;color:var(--tx);font-size:14.5px;line-height:1.75}
+.past{max-width:1180px;margin:0 auto;padding:6px 16px 26px;text-align:center;font-size:13.5px;color:var(--sub)}
+.past h2{margin:0 0 4px;font-size:15px;font-weight:700}
+.past p{margin:0;line-height:2}
+.past a{color:var(--ac);font-weight:700}
 </style></head><body>
 <header>
   <a class="jplink" href="https://fabas-official.github.io/123tube/">🇯🇵 日本語版はこちら (Japanese edition)</a>
@@ -229,6 +235,7 @@ footer a{color:var(--ac);font-weight:700}
   __NEWTOTAL__
 </header>
 <main>__BODY__</main>
+__PAST__
 <footer>
   <p>Last updated: __UPD__ JST ／ Sources: YouTube Data API v3, worldwide English-language search
   (Anime / Travel / Food) with new uploads from official and trusted channels placed first, uploads from

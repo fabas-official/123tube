@@ -65,6 +65,11 @@ jobs:
           git config user.email "actions@github.com"
           git add index.html data.json history.json ownch_top.json hof.json sitemap.xml pool.json \
                   en/index.html en/data.json en/history.json en/pool.json en/sitemap.xml
+          # 🆕 日別ページ(d/ と en/d/)。-A なので「今日の追加」と「30日を過ぎた分の削除」の両方が commit される。
+          # ディレクトリがまだ無い日（初回・日別ページの生成が失敗した日）に git add が失敗しないよう、あるものだけ足す。
+          for dd in d en/d; do
+            if [ -d "$dd" ]; then git add -A "$dd"; fi
+          done
           if git diff --staged --quiet; then
             echo "変更なし。コミットをスキップ"
           else

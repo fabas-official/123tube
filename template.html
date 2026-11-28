@@ -312,6 +312,12 @@ footer a{color:var(--ac);font-weight:700}
   .pane.on>.top3{order:1}
   .lead p:not(.newline){order:2;text-align:center;margin:14px auto 6px}
 }
+/* 🆕 2026-11-28 今日の見どころ(.hl)と、フッター上の「過去のランキング」(.past)。本体の見た目は他は変えない */
+.lead p.hl{margin-top:10px;color:var(--tx);font-size:14.5px;line-height:1.75}
+.past{max-width:1180px;margin:0 auto;padding:6px 16px 26px;text-align:center;font-size:13.5px;color:var(--sub)}
+.past h2{margin:0 0 4px;font-size:15px;font-weight:700}
+.past p{margin:0;line-height:2}
+.past a{color:var(--ac);font-weight:700}
 </style></head><body>
 <header>
   <a class="jplink" href="https://fabas-official.github.io/123tube/en/">🌏 English edition: Japan Buzz</a>
@@ -321,6 +327,7 @@ footer a{color:var(--ac);font-weight:700}
   __NEWTOTAL__
 </header>
 <main>__BODY__</main>
+__PAST__
 <footer>
   <p>最終更新: __UPD__ ／ 対象地域: 日本 ／ 毎日自動更新<br>
   再生回数・コメント数は YouTube Data API v3 から取得した、取得時点の公式数値です。<br>
