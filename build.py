@@ -2816,7 +2816,16 @@ def main_en():
                 # 🆕 2026-11-28 信頼できる作り手・公式の新着を先頭へ（en/sources.json に載っている棚だけ）。
                 #    検索候補は後ろ。新着が取れない日は何も足さない＝従来どおりの棚になる。
                 boost = channel_boost(key, skip_top=block | tired)
-                if boost:
+                _bcfg = source_cfg(key) or {}
+                if boost and _bcfg.get('boost_only') and len(boost) >= int(_bcfg.get('boost_only_min', 10)):
+                    # 🆕 2026-11-28 公式の新着だけで棚を作る（設定 boost_only のある棚＝Anime）。
+                    #    検索で拾う分は毎日ちがう無関係動画（ゲームの予告・ファンメイド・他国の作品）が下位に混ざり、
+                    #    除外チャンネルを足しても翌日は別のチャンネルが来た。20本に届かなくても、混ぜずに出す
+                    #    （内田さん 2026-08-27「20本埋めるより、人が見たいと思うものだけ」）。新着が少ない日
+                    #    （boost_only_min 本未満）だけ、従来どおり検索候補を後ろに足す。
+                    print('   └ %s: official uploads only (%d videos; search results not mixed in)' % (key, len(boost)))
+                    vids = boost[:LIST_N]
+                elif boost:
                     _bi = set(v['videoId'] for v in boost)
                     vids = (boost + [v for v in vids if v['videoId'] not in _bi])[:LIST_N]
                     pool = pool + [v for v in boost if v['videoId'] not in set(x['videoId'] for x in pool)]

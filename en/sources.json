@@ -46,7 +46,7 @@
   "max_hours": 240,
   "boost_max": 20,
   "min_views": 1000,
-  "per_channel": 5,
+  "per_channel": 8,
   "pages": 2,
   "channels": [
    {
@@ -78,7 +78,9 @@
     "name": "Sentai Filmworks"
    }
   ],
-  "top3_hours": 72
+  "top3_hours": 72,
+  "boost_only": true,
+  "boost_only_min": 10
  },
  "travel": {
   "how_source": "trusted Japan travel creators",
