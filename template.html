@@ -283,6 +283,35 @@ footer a{color:var(--ac);font-weight:700}
   padding:11px 16px;font:inherit;font-weight:700;font-size:14px;cursor:pointer;
   background:var(--ac-fill,#c8372d);color:var(--on-ac,#fff);box-shadow:0 4px 14px rgba(0,0,0,.28)}
 .totop.show{display:block}
+
+/* ── スマホ幅の並び替え（2026-11-28） ─────────────────────────────
+   スマホで開くと最初の画面がメニューだけで、最初の動画は約1.7画面下（実測 1,384px）だった。
+   動画を見に来た人に、選ばせる前にまず1本見せる。並びを
+     総合（細い帯）→ 今日のジャンル → 中身 → 殿堂入り → うっちーPの歌
+   に変える。HTML は変えず、表示の順番だけ（パソコン幅は今までどおり）。 */
+@media(max-width:699px){
+  header{padding:18px 16px 8px}
+  main{display:flex;flex-direction:column}
+  .navwrap,.rowsbox{display:contents}
+  .tab.mega.mtrend{order:1;display:flex;align-items:center;justify-content:center;gap:10px;padding:8px 12px;margin:6px 0 10px}
+  .mtrend i{display:none}
+  .mtrend .mcta{margin-top:0;padding:6px 14px}
+  .tabrow.today{order:2;margin:0 0 16px}
+  .panes{order:3;margin:0 0 26px}
+  .tabrow.hof{order:4;margin:0 0 12px}
+  .tab.mega.mown{order:5}
+
+  /* 棚の見出しを短くする: 「今日」の印・棚の名前・新顔の本数だけを先に出し、説明文と選び方は3枚のカードの後ろへ回す
+     （消さない。フッターで「その日に使った条件は各タブに表示します」と約束しているため）。 */
+  .pane.on{display:flex;flex-direction:column}
+  .pane.on>*{order:3}
+  .pane.on>.lead{display:contents}
+  .lead .lbadge{order:0;align-self:center}
+  .lead h2{order:0;text-align:center;margin:0 0 4px}
+  .lead .newline{order:0;text-align:center;margin:0 0 14px}
+  .pane.on>.top3{order:1}
+  .lead p:not(.newline){order:2;text-align:center;margin:14px auto 6px}
+}
 </style></head><body>
 <header>
   <a class="jplink" href="https://fabas-official.github.io/123tube/en/">🌏 English edition: Japan Buzz</a>

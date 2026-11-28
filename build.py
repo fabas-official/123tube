@@ -263,6 +263,10 @@ FRESH = {
 # 「公式PVと、名シーンの考察・解説」なので半分ずつにする。他の棚は元の検索と新着が同じ種類の
 # 動画なので制限しない（制限すると古い動画が戻ってくるだけ）。
 FRESH_MAX = {'anime': 10}
+# 🆕 2026-11-28 棚ごとに題名で外す型。恋愛・人間関係は「うちの本業にいちばん近い棚」だが、公開中の20本のうち8本、
+#    ベスト3のうち2本が「【漫画】温泉旅館を経営する俺→銀行マンに…」型の量産の漫画動画で、恋愛や人づきあいの話ではなかった
+#    （検索語「恋愛」にチャンネル名「恋愛漫画」で当たる）。人が話している動画・番組・対談を残す。
+THEME_TITLE_NG = {'renai': (u'【漫画】', u'【恋愛漫画】', u'【マンガ】', u'【スカッと', u'漫画動画')}
 _fresh_only = {}        # 棚キー → 今回のビルドで「新着の検索だけ」で見つかった動画ID
 
 # タブのボタンでだけ使う短い呼び名。7個×2段に収めるための措置で、
@@ -976,6 +980,15 @@ def theme_videos(queries, dur, window=None, key=None):
     # rank_today() が「その日の伸び」で選ぶ前に再生数順で切られてしまうため。
     vids = dedupe_titles(sorted(hydrate(ids), key=lambda x: -x['views']))
     vids = filter_lang(vids, key)
+    # 🆕 2026-11-28 棚に合わない型の動画を題名で外す（THEME_TITLE_NG）。候補が痩せる日は外さない（棚を空にしない）。
+    _ng = THEME_TITLE_NG.get(key) if EDITION == 'jp' else None
+    if _ng:
+        _kept = [v for v in vids if not any(w in v.get('title', '') for w in _ng)]
+        if len(_kept) >= 30:
+            print('   └ 棚に合わない型の%d本を外す（%d→%d本）' % (len(vids) - len(_kept), len(vids), len(_kept)))
+            vids = _kept
+        else:
+            print('   └ ⚠️ 棚に合わない型を外すと%d本しか残らないので、今日は外さない' % len(_kept))
     fresh = len([v for v in vids if age_days(v) <= TODAY_MAX_AGE])
     print('   └ 直近%d日で%d本（うち%d日以内=%d本）' % (days, len(vids), TODAY_MAX_AGE, fresh))
     return vids                                # 振り分けは rank_today() と topup() が行う
