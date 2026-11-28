@@ -276,6 +276,13 @@ footer{border-top:1px solid var(--line);padding:32px 20px 54px;text-align:center
        color:var(--sub);font-size:13.5px;line-height:2.05}
 footer b{color:var(--tx)}
 footer a{color:var(--ac);font-weight:700}
+
+/* 「ジャンルへ戻る」ボタン（2026-11-28）。棚を下まで読んだ後、別のジャンルへ移るには画面を数千px戻る必要があった
+   （スマホ幅で実測 7,300px）。ナビを通り過ぎたら右下に出し、押すとジャンルの並びへ戻る。 */
+.totop{position:fixed;right:14px;bottom:16px;z-index:50;display:none;border:0;border-radius:999px;
+  padding:11px 16px;font:inherit;font-weight:700;font-size:14px;cursor:pointer;
+  background:var(--ac-fill,#c8372d);color:var(--on-ac,#fff);box-shadow:0 4px 14px rgba(0,0,0,.28)}
+.totop.show{display:block}
 </style></head><body>
 <header>
   <a class="jplink" href="https://fabas-official.github.io/123tube/en/">🌏 English edition: Japan Buzz</a>
@@ -322,5 +329,16 @@ document.querySelectorAll('.tab').forEach(function (b) {
     p.scrollIntoView({ block: 'start', behavior: 'smooth' });
   });
 });
+
+// 「ジャンルへ戻る」ボタン。ナビ（main の先頭）が画面の上へ消えたら出す。
+(function () {
+  var b = document.querySelector('.totop'), m = document.querySelector('main');
+  if (!b || !m) { return; }
+  function upd() { b.classList.toggle('show', window.scrollY > m.offsetTop + 500); }
+  window.addEventListener('scroll', upd, { passive: true });
+  b.addEventListener('click', function () { m.scrollIntoView({ block: 'start', behavior: 'smooth' }); });
+  upd();
+})();
 </script>
+<button class="totop" type="button" aria-label="ジャンルを選び直す">▲ ジャンル</button>
 </body></html>

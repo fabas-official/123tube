@@ -2816,6 +2816,7 @@ def main_en():
                 # 🆕 2026-11-28 信頼できる作り手・公式の新着を先頭へ（en/sources.json に載っている棚だけ）。
                 #    検索候補は後ろ。新着が取れない日は何も足さない＝従来どおりの棚になる。
                 boost = channel_boost(key, skip_top=block | tired)
+                _bonly = False                       # この棚を公式の新着だけで作ったか（説明文に使う）
                 _bcfg = source_cfg(key) or {}
                 if boost and _bcfg.get('boost_only') and len(boost) >= int(_bcfg.get('boost_only_min', 10)):
                     # 🆕 2026-11-28 公式の新着だけで棚を作る（設定 boost_only のある棚＝Anime）。
@@ -2825,6 +2826,7 @@ def main_en():
                     #    （boost_only_min 本未満）だけ、従来どおり検索候補を後ろに足す。
                     print('   └ %s: official uploads only (%d videos; search results not mixed in)' % (key, len(boost)))
                     vids = boost[:LIST_N]
+                    _bonly = True
                 elif boost:
                     _bi = set(v['videoId'] for v in boost)
                     vids = (boost + [v for v in vids if v['videoId'] not in _bi])[:LIST_N]
@@ -2846,6 +2848,10 @@ def main_en():
                     _src += ' + new uploads from the last %d days' % min(s[2] for s in FRESH[key])
                 how = ('source: %s / order: %s / top3 within %d days'
                        % (_src, _mode_en(_last_mode), _last_top_age))
+                if _bonly:
+                    # 公式の新着だけで作った日は、検索を使ったと書かない（説明と棚を食い違わせない）
+                    how = ('source: new uploads from %d official channels (last %d days) / order: views per hour since upload'
+                           % (len(source_cfg(key)['channels']), int(source_cfg(key).get('max_hours', 240)) // 24))
         except Exception as e:                      # 1テーマ失敗で全体を落とさない（JP版と同じ思想）
             print('NG %s: %s' % (label, str(e)[:160]))
             vids = None
