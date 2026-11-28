@@ -125,7 +125,8 @@
     "name": "Japan Guide"
    }
   ],
-  "top3_hours": 96
+  "top3_hours": 96,
+  "require_title": "japan|tokyo|kyoto|osaka|hokkaido|okinawa|fuji|shinkansen|onsen|ryokan|izakaya|nagoya|fukuoka|hiroshima|nara\\b|sapporo|kobe|yokohama"
  },
  "food": {
   "how_source": "trusted Japan food creators",

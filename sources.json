@@ -80,7 +80,8 @@
     "id": "UCQhaZjODkIjuv38d-i5TVRw",
     "name": "カンテレNEWS"
    }
-  ]
+  ],
+  "per_topic": 2
  },
  "geinou": {
   "how_source": "芸能ニュースの公式チャンネル",
@@ -170,6 +171,7 @@
     "id": "UC7_mFzmj89tqAqgpl5695QQ",
     "name": "フジテレビ公式"
    }
-  ]
+  ],
+  "per_topic": 2
  }
 }

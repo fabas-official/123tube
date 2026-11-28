@@ -380,7 +380,10 @@ EN_SEARCH_MIN_VIEWS = {'travel': 5000, 'food': 5000}
 FOOD_OTHER_PLACES = re.compile(r'ho chi minh|saigon|hanoi|vietnam|bangkok|thailand|seoul|korea|busan|taiwan|taipei|'
                                r'hong kong|singapore|bali|indonesia|manila|philippines|india|mumbai|delhi|istanbul|'
                                r'turkey|london|paris|new york|mexico|china|beijing|shanghai', re.I)
-FOOD_JAPAN_WORDS = re.compile(r'japan|japanese|tokyo|osaka|kyoto|nagoya|hokkaido|fukuoka|okinawa|nara|hiroshima|'
+# 「japanese」は入れない（2026-11-28 PM検証）: 「Ho Chi Minh City's Bar Scene: Vietnamese Food Over Japanese Charcoal」
+# のように、他国の街が主題で日本は炭の形容だけ、という動画が通っていた。国名か日本の地名がある時だけ残す
+# （「Japan's Popular Beef Bowl Chain Opens in Singapore」は japan があるので残る）。
+FOOD_JAPAN_WORDS = re.compile(r'\bjapan\b|japan[\'’]s|tokyo|osaka|kyoto|nagoya|hokkaido|fukuoka|okinawa|\bnara\b|hiroshima|'
                               r'sapporo|kobe|yokohama', re.I)
 
 # ── 英語版: 他の言語の動画を外す（2026-10-09 追加） ─────────────────────────────
@@ -1418,6 +1421,53 @@ def _ng_re(words):
     return re.compile('|'.join(words), re.I) if words else None
 
 
+# ── 同じ話題の動画を数える（2026-11-28 PM検証で追加） ─────────────────────────────
+# 局の新着を伸び順に並べただけだと、大きな出来事があった日は棚がその1件で埋まる
+# （実測 11/28 朝: ニュース20本中16本が同じ「問責決議案」）。毎日開く人が見たいのは「今日の主な話題が一通り」。
+# → 題名の漢字2文字の並び（＋3文字以上のカタカナ語）が TOPIC_SHARE 個以上重なる動画を同じ話題とみなし、
+#   同じ話題は sources.json の per_topic 本まで・ベスト3は別の話題から選ぶ。あふれた分は消さず、
+#   棚が埋まらない時だけ末尾に戻す。どの記事にも出る語（総理・逮捕・番組名など）は数えない。
+TOPIC_SHARE = 3
+_TOPIC_STOP = set('高市 市総 総理 首相 大臣 政府 日本 速報 解説 記者 会見 報道 東京 大阪 中継 逮捕 容疑 疑者 警察 事件 事故 '
+                  '死亡 男性 女性 現場 映像 発表 午前 午後 今日 明日 最新 独自 緊急 特集 密着 全国 公開 登壇 出演 披露 '
+                  '主演 映画 舞台 挨拶 台挨 新曲 発売 決定 開催 イベ 登場 祝福 初日 完成 試写 写会 生放 放送 '
+                  'ニュース ノーカット コメント ステーション チャンネル スーパー インタビュー イベント トーク メッセージ '
+                  'ライブ ドラマ アニメ テレビ'.split())
+
+
+def topic_grams(title):
+    """題名から「話題の手がかり」を取り出す。漢字の並びは2文字ずつ、カタカナ語は語ごと。"""
+    g = set()
+    for run in re.findall(u'[一-鿿々]{2,}', title or ''):
+        for i in range(len(run) - 1):
+            if run[i:i + 2] not in _TOPIC_STOP:
+                g.add(run[i:i + 2])
+    for w in re.findall(u'[ァ-ヺー]{3,}', title or ''):
+        if w not in _TOPIC_STOP:
+            g.add(w)
+    return g
+
+
+def topic_ids(vids):
+    """並び順（伸び順）に見て、動画ID -> 話題の番号 を返す。先に出た動画の話題に寄せる。
+    比べる相手は各話題の最初の3本まで（全員と比べると、少しずつずれて別の話題まで飲み込む）。"""
+    clusters, out = [], {}
+    for v in vids:
+        g = topic_grams(v.get('title', ''))
+        hit = None
+        for n, members in enumerate(clusters):
+            if any(len(g & m) >= TOPIC_SHARE for m in members[:3]):
+                hit = n
+                break
+        if hit is None:
+            clusters.append([g])
+            hit = len(clusters) - 1
+        else:
+            clusters[hit].append(g)
+        out[v['videoId']] = hit
+    return out
+
+
 def build_channel_shelf(cands, cfg, now, want=LIST_N, skip_top=frozenset()):
     """チャンネルの新着の候補 -> 棚（vids, info）。
 
@@ -1433,6 +1483,9 @@ def build_channel_shelf(cands, cfg, now, want=LIST_N, skip_top=frozenset()):
     fill_h = float(cfg.get('fill_hours', max_h))
     per = int(cfg.get('per_channel', 4))
     minv = int(cfg.get('min_views', 0))
+    # 題名にこの語が無い動画は外す（例: 旅行の作り手が上げた、日本と関係ない雑談）。設定が無ければ何もしない
+    req = _ng_re([cfg['require_title']]) if cfg.get('require_title') else None
+    per_topic = int(cfg.get('per_topic', 0))        # 同じ話題を何本まで並べるか（0=数えない）
     ok = []
     for v in cands:
         h = hours_since(v, now)
@@ -1440,28 +1493,47 @@ def build_channel_shelf(cands, cfg, now, want=LIST_N, skip_top=frozenset()):
             continue
         if ng and ng.search(v.get('title', '')):
             continue
+        if req and not req.search(v.get('title', '')):
+            continue
         v['_h'] = h
         v['_rate'] = v['views'] / (h + NEWS_TIME_BASE_H)
         ok.append(v)
     ok = dedupe_titles(sorted(ok, key=lambda x: -x['_rate']))
+    topic = topic_ids(ok) if per_topic else {}
+    over = []                                       # 同じ話題の上限からあふれた動画（消さない）
 
     def within(limit):
-        return cap_channel([v for v in ok if v['_h'] <= limit], per)
+        lst0 = cap_channel([v for v in ok if v['_h'] <= limit], per)
+        if not per_topic:
+            return lst0
+        cnt, kept = {}, []
+        del over[:]
+        for v in lst0:
+            t = topic[v['videoId']]
+            if cnt.get(t, 0) >= per_topic:
+                over.append(v)
+                continue
+            cnt[t] = cnt.get(t, 0) + 1
+            kept.append(v)
+        return kept
 
     win = max_h
     lst = within(win)
     if len(lst) < want and fill_h > win:
         win = fill_h
         lst = within(win)
-    top, used = [], set()
+    top, used, used_topic = [], set(), set()
     lim_used = top_h
     for lim in (top_h, max_h, win):
         for v in lst:
             if len(top) >= 3:
                 break
-            if v['_h'] <= lim and v['videoId'] not in skip_top and v['channelTitle'] not in used:
+            t = topic.get(v['videoId'])
+            if (v['_h'] <= lim and v['videoId'] not in skip_top and v['channelTitle'] not in used
+                    and (t is None or t not in used_topic)):     # ベスト3は別チャンネル・別の話題から
                 top.append(v)
                 used.add(v['channelTitle'])
+                used_topic.add(t)
         lim_used = lim
         if len(top) >= 3:
             break
@@ -1473,6 +1545,11 @@ def build_channel_shelf(cands, cfg, now, want=LIST_N, skip_top=frozenset()):
                 top.append(v)
     rest = [v for v in lst if v not in top]
     out = (top + rest)[:want]
+    if len(out) < want and over:
+        # 話題の上限で外した分は、棚が埋まらない日だけ末尾に戻す（棚を痩せさせない）
+        out = out + over[:want - len(out)]
+    if per_topic and over:
+        print('   └ 同じ話題は%d本まで: %d本を後ろへ回した' % (per_topic, len(over)))
     top_max = max([v['_h'] for v in out[:3]] or [0])
     info = {'window_h': win, 'top_limit_h': lim_used, 'top_max_h': top_max,
             'widened': lim_used > top_h or win > max_h,
@@ -1669,6 +1746,11 @@ def news_only():
             th['new_count'] = sum(1 for v in th['videos'] if v.get('new'))
         data['themes'][idx] = th
         done.append('%s(%d本・ベスト3 %s)' % (key, len(vids), '/'.join('%.0fh' % (v.get('hours') or 0) for v in vids[:3])))
+    if not done:
+        # 1つも取り直せなかった回は台帳を書かない。news_updated だけ進めると「更新した」ように見え、
+        # 監視（6時間以上あいたら知らせる）が効かなくなる。次の回（30分後）がもう一度試す。
+        print('NEWS-ONLY 更新=なし（台帳は書かない・news_updated は進めない）')
+        return
     data['news_updated'] = now_str
     write_json(DATA, data)
     size = render_en(data) if EDITION == 'en' else render(data, load_hof())
