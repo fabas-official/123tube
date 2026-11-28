@@ -1561,6 +1561,9 @@ def channel_shelf_route(key, skip_top=frozenset(), now=None):
              '・広げた' if info['widened'] else ''))
     if not vids:
         raise RuntimeError('チャンネルの新着から1本も作れず')
+    if len(vids) < LIST_N:
+        # 足りない日は足りないまま出し、本数を必ず残す（検索で水増ししない。最上位ルール(-0.4)＝減った事実を黙らせない）
+        print('   └ ⚠️ %s は%d本しか作れず（目標%d本・足りない%d本）' % (key, len(vids), LIST_N, LIST_N - len(vids)))
     return vids, pool, how
 
 
