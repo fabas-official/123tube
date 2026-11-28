@@ -6,4 +6,34 @@
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
+  <url>
+    <loc>https://fabas-official.github.io/123tube/en/</loc>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://fabas-official.github.io/123tube/d/index.html</loc>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://fabas-official.github.io/123tube/d/2026-11-28.html</loc>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>never</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://fabas-official.github.io/123tube/en/d/index.html</loc>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://fabas-official.github.io/123tube/en/d/2026-11-28.html</loc>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>never</changefreq>
+    <priority>0.5</priority>
+  </url>
 </urlset>
